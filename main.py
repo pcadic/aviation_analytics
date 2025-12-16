@@ -1,51 +1,36 @@
 import os
 import requests
 from datetime import datetime
-from supabase import create_client, Client
+from supabase import create_client
 
-# =====================
-# Configuration
-# =====================
 AVIATIONSTACK_API_KEY = os.getenv("AVIATIONSTACK_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-AIRPORT_ICAO = "CYVR"  # Vancouver
-AVIATIONSTACK_URL = "http://api.aviationstack.com/v1/flights"
+AIRPORT_ICAO = "CYVR"
+BASE_URL = "http://api.aviationstack.com/v1/flights"
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+def check_limit(data, label):
+    if len(data) == 100:
+        print(f"⚠️ ALERTE: {label} atteint la limite de 100 résultats")
 
-# =====================
-# Fetch Aviationstack
-# =====================
-def fetch_flights():
-    params = {
-        "access_key": AVIATIONSTACK_API_KEY,
-        "limit": 100,
-        "flight_status": "active"
-    }
-    response = requests.get(AVIATIONSTACK_URL, params=params, timeout=30)
-    response.raise_for_status()
-    return response.json().get("data", [])
+def fetch_flights(params):
+    params["access_key"] = AVIATIONSTACK_API_KEY
+    params["limit"] = 100
+
+    r = requests.get(BASE_URL, params=params, timeout=30)
+    r.raise_for_status()
+    return r.json().get("data", [])
 
 
-# =====================
-# Transform record
-# =====================
-def transform(record):
+def transform(record, movement_type):
     dep = record.get("departure") or {}
     arr = record.get("arrival") or {}
     airline = record.get("airline") or {}
     flight = record.get("flight") or {}
     aircraft = record.get("aircraft") or {}
-
-    if dep.get("icao") == AIRPORT_ICAO:
-        movement_type = "departure"
-    elif arr.get("icao") == AIRPORT_ICAO:
-        movement_type = "arrival"
-    else:
-        return None  # on ignore les autres vols
 
     return {
         "airport_icao": AIRPORT_ICAO,
@@ -81,41 +66,31 @@ def transform(record):
     }
 
 
-# =====================
-# Insert into Supabase
-# =====================
-def insert_rows(rows):
-    if not rows:
-        print("Aucun vol à insérer.")
-        return
-
-    supabase.table("flights").upsert(
-        rows,
-        on_conflict="flight_date,flight_icao,movement_type"
-    ).execute()
-
-    print(f"{len(rows)} vols insérés / mis à jour.")
+def upsert(rows):
+    if rows:
+        supabase.table("flights").upsert(
+            rows,
+            on_conflict="flight_date,flight_icao,movement_type"
+        ).execute()
 
 
-# =====================
-# Main
-# =====================
 def main():
-    print("→ Fetch Aviationstack")
-    raw_flights = fetch_flights()
+    all_rows = []
 
-    print(f"→ {len(raw_flights)} vols reçus")
+    # ARRIVÉES
+    arrivals = fetch_flights({"arr_icao": AIRPORT_ICAO})
+    check_limit(arrivals, "Arrivées")
+    for r in arrivals:
+        all_rows.append(transform(r, "arrival"))
 
-    transformed = []
-    for r in raw_flights:
-        row = transform(r)
-        if row:
-            transformed.append(row)
+    # DÉPARTS
+    departures = fetch_flights({"dep_icao": AIRPORT_ICAO})
+    check_limit(departures, "Départs")
+    for r in departures:
+        all_rows.append(transform(r, "departure"))
 
-    print(f"→ {len(transformed)} vols liés à {AIRPORT_ICAO}")
-
-    insert_rows(transformed)
-    print("✓ Terminé")
+    print(f"{len(all_rows)} vols collectés pour {AIRPORT_ICAO}")
+    upsert(all_rows)
 
 
 if __name__ == "__main__":
