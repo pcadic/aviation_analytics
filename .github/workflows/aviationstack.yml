@@ -5,7 +5,7 @@ name: Aviationstack daily ingestion
 
 on:
   schedule:
-    - cron: "0 3 * * *"   # tous les jours à 03:00 UTC
+    - cron: "0 */12 * * *"   # toutes les 12h
   workflow_dispatch:
 
 jobs:
