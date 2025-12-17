@@ -36,8 +36,22 @@ def fetch_realtime(movement_type):
 
 
 def fetch_flight_info(flight_icao):
-    data = call_airlabs(FLIGHT_INFO_URL, {"flight_icao": flight_icao})
-    return data[0] if data else None
+    response = requests.get(
+        FLIGHT_INFO_URL,
+        params={
+            "api_key": AIRLABS_API_KEY,
+            "flight_icao": flight_icao
+        },
+        timeout=30
+    )
+    response.raise_for_status()
+
+    data = response.json()
+
+    if "response" not in data:
+        return None
+
+    return data["response"]
 
 
 def parse_time(value):
