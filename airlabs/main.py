@@ -1,11 +1,11 @@
 import os
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from supabase import create_client
 
-# =====================
-# Config
-# =====================
+# ======================================================
+# Configuration
+# ======================================================
 AIRLABS_API_KEY = os.getenv("AIRLABS_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -18,70 +18,92 @@ FLIGHT_INFO_URL = "https://airlabs.co/api/v9/flight"
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-# =====================
+# ======================================================
 # Helpers
-# =====================
-def call_api(url, params):
+# ======================================================
+def call_airlabs(url, params):
     params["api_key"] = AIRLABS_API_KEY
     r = requests.get(url, params=params, timeout=30)
     r.raise_for_status()
     return r.json().get("response", [])
 
 
-def fetch_realtime(arr_or_dep):
-    if arr_or_dep == "arrival":
-        return call_api(REALTIME_URL, {"arr_icao": AIRPORT_ICAO})
+def fetch_realtime(movement_type):
+    if movement_type == "arrival":
+        return call_airlabs(REALTIME_URL, {"arr_icao": AIRPORT_ICAO})
     else:
-        return call_api(REALTIME_URL, {"dep_icao": AIRPORT_ICAO})
+        return call_airlabs(REALTIME_URL, {"dep_icao": AIRPORT_ICAO})
 
 
 def fetch_flight_info(flight_icao):
-    data = call_api(FLIGHT_INFO_URL, {"flight_icao": flight_icao})
+    data = call_airlabs(FLIGHT_INFO_URL, {"flight_icao": flight_icao})
     return data[0] if data else None
 
 
+def parse_time(value):
+    if not value:
+        return None
+    return value  # AirLabs renvoie déjà de l’ISO8601
+
+
+# ======================================================
+# Transformation vers le schéma Aviationstack
+# ======================================================
 def transform(realtime, info, movement_type):
     dep = info.get("dep") or {}
     arr = info.get("arr") or {}
     airline = info.get("airline") or {}
     aircraft = info.get("aircraft") or {}
 
-    scheduled = dep.get("scheduled") if movement_type == "departure" else arr.get("scheduled")
-    actual = dep.get("actual") if movement_type == "departure" else arr.get("actual")
-
     return {
-        "flight_date": datetime.utcnow().date().isoformat(),
-        "flight_icao": realtime.get("flight_icao"),
-        "flight_number": realtime.get("flight_number"),
-        "airline_name": airline.get("name"),
-
-        "movement_type": movement_type,
-        "dep_icao": dep.get("icao"),
-        "arr_icao": arr.get("icao"),
-
-        "scheduled_time": scheduled,
-        "actual_time": actual,
-        "reference_time": actual or scheduled,
-
+        # ---- Vol ----
+        "flight_date": datetime.now(timezone.utc).date().isoformat(),
         "flight_status": realtime.get("status"),
 
+        "airline_name": airline.get("name"),
+        "flight_number": realtime.get("flight_number"),
+        "flight_icao": realtime.get("flight_icao"),
+
+        "movement_type": movement_type,
+
+        # ---- Departure ----
+        "dep_airport": dep.get("airport"),
+        "dep_icao": dep.get("icao"),
+        "dep_timezone": dep.get("timezone"),
+        "dep_terminal": dep.get("terminal"),
+        "dep_gate": dep.get("gate"),
+        "dep_delay_minutes": dep.get("delay"),
+        "dep_actual": parse_time(dep.get("actual")),
+
+        # ---- Arrival ----
+        "arr_airport": arr.get("airport"),
+        "arr_icao": arr.get("icao"),
+        "arr_timezone": arr.get("timezone"),
+        "arr_terminal": arr.get("terminal"),
+        "arr_gate": arr.get("gate"),
+        "arr_baggage": arr.get("baggage"),
+        "arr_delay_minutes": arr.get("delay"),
+        "arr_actual": parse_time(arr.get("actual")),
+
+        # ---- Aircraft ----
         "aircraft_icao": aircraft.get("icao"),
         "aircraft_registration": aircraft.get("registration"),
 
+        # ---- Meta ----
         "source_provider": "airlabs",
-        "ingested_at": datetime.utcnow().isoformat()
+        "ingested_at": datetime.now(timezone.utc).isoformat()
     }
 
 
-# =====================
+# ======================================================
 # Main
-# =====================
+# ======================================================
 def main():
     rows = []
 
-    for movement in ["arrival", "departure"]:
-        realtime_flights = fetch_realtime(movement)
-        print(f"{movement}: {len(realtime_flights)} vols")
+    for movement_type in ["arrival", "departure"]:
+        realtime_flights = fetch_realtime(movement_type)
+        print(f"{movement_type.upper()} : {len(realtime_flights)} vols")
 
         for f in realtime_flights:
             flight_icao = f.get("flight_icao")
@@ -92,7 +114,8 @@ def main():
             if not info:
                 continue
 
-            rows.append(transform(f, info, movement))
+            row = transform(f, info, movement_type)
+            rows.append(row)
 
     if rows:
         supabase.table("flights_airlabs").upsert(
@@ -100,7 +123,7 @@ def main():
             on_conflict="flight_date,flight_icao,movement_type"
         ).execute()
 
-    print(f"{len(rows)} vols AirLabs insérés")
+    print(f"✓ {len(rows)} vols AirLabs insérés / mis à jour")
 
 
 if __name__ == "__main__":
