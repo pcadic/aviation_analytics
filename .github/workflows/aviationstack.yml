@@ -29,4 +29,4 @@ jobs:
           AVIATIONSTACK_API_KEY: ${{ secrets.AVIATIONSTACK_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: python main.py
+        run: python aviationstack/main.py
