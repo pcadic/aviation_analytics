@@ -50,58 +50,67 @@ def fetch_flight_info(flight_icao):
 def transform(rt, info):
     info = info or {}
 
-    dep = info.get("dep") or {}
-    arr = info.get("arr") or {}
-    airline = info.get("airline") or {}
-    aircraft = info.get("aircraft") or {}
-
     return {
-        # Vol
+        # =====================
+        # Vol (Realtime)
+        # =====================
         "flight_icao": rt.get("flight_icao"),
         "flight_number": rt.get("flight_number"),
         "airline_icao": rt.get("airline_icao"),
         "status": rt.get("status"),
 
-        # Compagnie
-        "airline_name": airline.get("name"),
+        # =====================
+        # Compagnie (Flight Info)
+        # =====================
+        "airline_name": info.get("airline_name"),
 
+        # =====================
         # Départ
+        # =====================
         "dep_icao": rt.get("dep_icao"),
-        "dep_terminal": dep.get("terminal"),
-        "dep_gate": dep.get("gate"),
-        "dep_time": dep.get("scheduled"),
-        "dep_estimated": dep.get("estimated"),
-        "dep_actual": dep.get("actual"),
-        "dep_name": dep.get("airport"),
-        "dep_city": dep.get("city"),
-        "dep_country": dep.get("country"),
-        "dep_delayed": dep.get("delay"),
+        "dep_terminal": info.get("dep_terminal"),
+        "dep_gate": info.get("dep_gate"),
+        "dep_time": info.get("dep_time"),
+        "dep_estimated": info.get("dep_estimated"),
+        "dep_actual": info.get("dep_actual"),
+        "dep_name": info.get("dep_name"),
+        "dep_city": info.get("dep_city"),
+        "dep_country": info.get("dep_country"),
+        "dep_delayed": info.get("dep_delayed"),
 
+        # =====================
         # Arrivée
+        # =====================
         "arr_icao": rt.get("arr_icao"),
-        "arr_terminal": arr.get("terminal"),
-        "arr_gate": arr.get("gate"),
-        "arr_baggage": arr.get("baggage"),
-        "arr_time": arr.get("scheduled"),
-        "arr_estimated": arr.get("estimated"),
-        "arr_actual": arr.get("actual"),
-        "arr_name": arr.get("airport"),
-        "arr_city": arr.get("city"),
-        "arr_country": arr.get("country"),
-        "arr_delayed": arr.get("delay"),
+        "arr_terminal": info.get("arr_terminal"),
+        "arr_gate": info.get("arr_gate"),
+        "arr_baggage": info.get("arr_baggage"),
+        "arr_time": info.get("arr_time"),
+        "arr_estimated": info.get("arr_estimated"),
+        "arr_actual": info.get("arr_actual"),
+        "arr_name": info.get("arr_name"),
+        "arr_city": info.get("arr_city"),
+        "arr_country": info.get("arr_country"),
+        "arr_delayed": info.get("arr_delayed"),
 
+        # =====================
         # Avion
+        # =====================
         "reg_number": rt.get("reg_number"),
         "aircraft_icao": rt.get("aircraft_icao"),
-        "model": aircraft.get("model"),
-        "manufacturer": aircraft.get("manufacturer"),
-        "type": aircraft.get("type"),
-        "age": aircraft.get("age"),
+        "model": info.get("model"),
+        "manufacturer": info.get("manufacturer"),
+        "type": info.get("type"),
+        "age": info.get("age"),
 
+        # =====================
         # Vol technique
+        # =====================
         "duration": info.get("duration"),
 
+        # =====================
         # Meta
+        # =====================
         "source_provider": "airlabs",
         "ingested_at": datetime.now(timezone.utc).isoformat()
     }
