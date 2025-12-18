@@ -61,52 +61,75 @@ def parse_time(value):
 
 
 # ======================================================
-# Transformation vers le schéma Aviationstack
+# Transformation vers le schéma Airlabs
 # ======================================================
 def transform(realtime, info, movement_type):
-    dep = info.get("dep") or {}
-    arr = info.get("arr") or {}
-    airline = info.get("airline") or {}
-    aircraft = info.get("aircraft") or {}
+    info = info or {}
+
+    dep_info = info.get("dep") or {}
+    arr_info = info.get("arr") or {}
+    airline_info = info.get("airline") or {}
+    aircraft_info = info.get("aircraft") or {}
 
     return {
-        # ---- Vol ----
+        # -------------------------
+        # Flight core
+        # -------------------------
         "flight_date": datetime.now(timezone.utc).date().isoformat(),
         "flight_status": realtime.get("status"),
 
-        "airline_name": airline.get("name"),
+        "airline_name": (
+            airline_info.get("name")
+            or realtime.get("airline_name")
+        ),
+
         "flight_number": realtime.get("flight_number"),
         "flight_icao": realtime.get("flight_icao"),
 
         "movement_type": movement_type,
 
-        # ---- Departure ----
-        "dep_airport": dep.get("airport"),
-        "dep_icao": dep.get("icao"),
-        "dep_timezone": dep.get("timezone"),
-        "dep_terminal": dep.get("terminal"),
-        "dep_gate": dep.get("gate"),
-        "dep_delay_minutes": dep.get("delay"),
-        "dep_actual": parse_time(dep.get("actual")),
+        # -------------------------
+        # Departure (REALTIME FIRST)
+        # -------------------------
+        "dep_airport": (
+            dep_info.get("airport")
+            or realtime.get("dep_airport")
+        ),
+        "dep_icao": realtime.get("dep_icao"),
+        "dep_timezone": dep_info.get("timezone"),
+        "dep_terminal": dep_info.get("terminal"),
+        "dep_gate": dep_info.get("gate"),
+        "dep_delay_minutes": dep_info.get("delay"),
+        "dep_actual": dep_info.get("actual"),
 
-        # ---- Arrival ----
-        "arr_airport": arr.get("airport"),
-        "arr_icao": arr.get("icao"),
-        "arr_timezone": arr.get("timezone"),
-        "arr_terminal": arr.get("terminal"),
-        "arr_gate": arr.get("gate"),
-        "arr_baggage": arr.get("baggage"),
-        "arr_delay_minutes": arr.get("delay"),
-        "arr_actual": parse_time(arr.get("actual")),
+        # -------------------------
+        # Arrival (REALTIME FIRST)
+        # -------------------------
+        "arr_airport": (
+            arr_info.get("airport")
+            or realtime.get("arr_airport")
+        ),
+        "arr_icao": realtime.get("arr_icao"),
+        "arr_timezone": arr_info.get("timezone"),
+        "arr_terminal": arr_info.get("terminal"),
+        "arr_gate": arr_info.get("gate"),
+        "arr_baggage": arr_info.get("baggage"),
+        "arr_delay_minutes": arr_info.get("delay"),
+        "arr_actual": arr_info.get("actual"),
 
-        # ---- Aircraft ----
-        "aircraft_icao": aircraft.get("icao"),
-        "aircraft_registration": aircraft.get("registration"),
+        # -------------------------
+        # Aircraft (INFO ONLY)
+        # -------------------------
+        "aircraft_icao": aircraft_info.get("icao"),
+        "aircraft_registration": aircraft_info.get("registration"),
 
-        # ---- Meta ----
+        # -------------------------
+        # Meta
+        # -------------------------
         "source_provider": "airlabs",
         "ingested_at": datetime.now(timezone.utc).isoformat()
     }
+
 
 
 # ======================================================
