@@ -1,8 +1,8 @@
 name: AirLabs ingestion
 
 on:
-  schedule:
-    - cron: "0 4,16 * * *"   # 04:00 UTC ≈ 20:00 Vancouver, then 16:00 UTC ≈ 08:00 Vancouver
+  #schedule:
+    #- cron: "0 4,16 * * *"   # 04:00 UTC ≈ 20:00 Vancouver, then 16:00 UTC ≈ 08:00 Vancouver
   workflow_dispatch:
 
 jobs:
