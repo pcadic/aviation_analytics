@@ -18,6 +18,8 @@ OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 def round_to_hour(dt):
     return dt.replace(minute=0, second=0, microsecond=0)
 
+def open_meteo_hour_str(dt):
+    return dt.strftime("%Y-%m-%dT%H:00")
 
 def select_weather_time(phase, flight):
     if phase == "DEP":
@@ -125,7 +127,9 @@ def main():
         date = w["dt"].date().isoformat()
         data = fetch_weather(w["lat"], w["lon"], date)
 
-        hour_idx = data["hourly"]["time"].index(w["dt"].isoformat())
+        hour_str = open_meteo_hour_str(w["dt"])
+        hour_idx = data["hourly"]["time"].index(hour_str)
+
 
         raw = {
             "temperature": data["hourly"]["temperature_2m"][hour_idx],
