@@ -72,13 +72,15 @@ def main():
     # 1️⃣ Flights sans météo
     flights = supabase.table("flights_airlabs") \
         .select("""
-            id,
+            flight_icao,
+            dep_time,
             dep_icao, arr_icao,
             dep_time_utc, dep_estimated_utc, dep_actual_utc,
             arr_time_utc, arr_estimated_utc, arr_actual_utc
         """) \
         .is_("dep_temperature", None) \
         .execute().data
+
 
     if not flights:
         print("No flights to enrich")
@@ -170,7 +172,8 @@ def main():
         if updates:
             supabase.table("flights_airlabs") \
                 .update(updates) \
-                .eq("id", f["id"]) \
+                .eq("flight_icao", f["flight_icao"]) \
+                .eq("dep_time", f["dep_time"])
                 .execute()
 
     print("Weather + features successfully added")
