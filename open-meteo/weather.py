@@ -173,7 +173,7 @@ def main():
             supabase.table("flights_airlabs") \
                 .update(updates) \
                 .eq("flight_icao", f["flight_icao"]) \
-                .eq("dep_time", f["dep_time"])
+                .eq("dep_time", f["dep_time"]) \
                 .execute()
 
     print("Weather + features successfully added")
