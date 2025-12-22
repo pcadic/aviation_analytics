@@ -127,7 +127,7 @@ def main():
     # 2️⃣ Airports (lat / lon)
     # --------------------------------------------------------------
 
-    airports = supabase.table("airports") \
+    airports = supabase.table("airports_referencess") \
         .select("icao, latitude, longitude") \
         .execute().data
 
