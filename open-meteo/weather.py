@@ -1,7 +1,12 @@
 import os
+import time
 import requests
 from dateutil import parser
 from supabase import create_client
+
+# ------------------------------------------------------------------
+# Configuration
+# ------------------------------------------------------------------
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
@@ -10,18 +15,19 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
-
-# -----------------------
+# ------------------------------------------------------------------
 # Utils
-# -----------------------
+# ------------------------------------------------------------------
 
 def round_to_hour(dt):
     return dt.replace(minute=0, second=0, microsecond=0)
 
-def open_meteo_hour_str(dt):
-    return dt.strftime("%Y-%m-%dT%H:00")
 
 def select_weather_time(phase, flight):
+    """
+    Priority order (UTC):
+    actual > estimated > scheduled
+    """
     if phase == "DEP":
         return (
             flight.get("dep_actual_utc")
@@ -36,42 +42,72 @@ def select_weather_time(phase, flight):
         )
 
 
-def derive_features(w):
-    is_rain = w["precipitation"] > 0.2
-    is_fog = w["visibility"] is not None and w["visibility"] < 1000
-    is_icing = w["temperature"] <= 0 and w["precipitation"] > 0
-    is_strong_wind = w["wind_speed"] > 30  # km/h
+def open_meteo_hour_str(dt):
+    # Open-Meteo format: YYYY-MM-DDTHH:00
+    return dt.strftime("%Y-%m-%dT%H:00")
+
+
+def derive_features(raw):
+    is_rain = raw["precipitation"] > 0.2
+    is_fog = raw["visibility"] is not None and raw["visibility"] < 1000
+    is_icing = raw["temperature"] <= 0 and raw["precipitation"] > 0
+    is_strong_wind = raw["wind_speed"] > 30  # km/h
 
     return {
         "is_rain": is_rain,
         "is_fog": is_fog,
         "is_icing": is_icing,
         "is_strong_wind": is_strong_wind,
-        "severity": sum([is_rain, is_fog, is_icing, is_strong_wind])
+        "severity": int(is_rain) + int(is_fog) + int(is_icing) + int(is_strong_wind),
     }
 
 
-def fetch_weather(lat, lon, date):
+def fetch_weather(lat, lon, date, retries=3, timeout=15):
+    """
+    Robust Open-Meteo call with retry + backoff
+    """
     params = {
         "latitude": lat,
         "longitude": lon,
         "hourly": "temperature_2m,visibility,precipitation,windspeed_10m",
         "start_date": date,
         "end_date": date,
-        "timezone": "UTC"
+        "timezone": "UTC",
     }
-    r = requests.get(OPEN_METEO_URL, params=params)
-    r.raise_for_status()
-    return r.json()
+
+    for attempt in range(1, retries + 1):
+        try:
+            r = requests.get(
+                OPEN_METEO_URL,
+                params=params,
+                timeout=timeout,
+            )
+            r.raise_for_status()
+            return r.json()
+
+        except requests.exceptions.RequestException as e:
+            print(
+                f"[Open-Meteo] Attempt {attempt}/{retries} failed "
+                f"(lat={lat}, lon={lon}, date={date}) → {e}"
+            )
+
+            if attempt < retries:
+                time.sleep(3 * attempt)
+            else:
+                print("[Open-Meteo] Giving up for this request")
+                return None
 
 
-# -----------------------
+# ------------------------------------------------------------------
 # Main
-# -----------------------
+# ------------------------------------------------------------------
 
 def main():
 
-    # 1️⃣ Flights sans météo
+    # --------------------------------------------------------------
+    # 1️⃣ Flights without weather
+    # --------------------------------------------------------------
+
     flights = supabase.table("flights_airlabs") \
         .select("""
             flight_icao,
@@ -83,19 +119,24 @@ def main():
         .is_("dep_temperature", None) \
         .execute().data
 
-
     if not flights:
         print("No flights to enrich")
         return
 
-    # 2️⃣ Airports
-    airports = supabase.table("airports_reference") \
+    # --------------------------------------------------------------
+    # 2️⃣ Airports (lat / lon)
+    # --------------------------------------------------------------
+
+    airports = supabase.table("airports") \
         .select("icao, latitude, longitude") \
         .execute().data
 
     airport_map = {a["icao"]: a for a in airports}
 
-    # 3️⃣ Déduplication des besoins météo
+    # --------------------------------------------------------------
+    # 3️⃣ Build unique weather requests
+    # --------------------------------------------------------------
+
     weather_cache = {}
 
     for f in flights:
@@ -117,32 +158,45 @@ def main():
                     "lat": airport["latitude"],
                     "lon": airport["longitude"],
                     "dt": dt,
-                    "data": None
+                    "data": None,
                 }
 
     print(f"Unique météo calls: {len(weather_cache)}")
 
-    # 4️⃣ Appels Open-Meteo
+    # --------------------------------------------------------------
+    # 4️⃣ Call Open-Meteo (batch, robust)
+    # --------------------------------------------------------------
+
     for key, w in weather_cache.items():
         date = w["dt"].date().isoformat()
         data = fetch_weather(w["lat"], w["lon"], date)
 
-        hour_str = open_meteo_hour_str(w["dt"])
-        hour_idx = data["hourly"]["time"].index(hour_str)
+        if not data:
+            continue
 
+        hour_str = open_meteo_hour_str(w["dt"])
+        if hour_str not in data["hourly"]["time"]:
+            continue
+
+        idx = data["hourly"]["time"].index(hour_str)
 
         raw = {
-            "temperature": data["hourly"]["temperature_2m"][hour_idx],
-            "visibility": data["hourly"]["visibility"][hour_idx],
-            "precipitation": data["hourly"]["precipitation"][hour_idx],
-            "wind_speed": data["hourly"]["windspeed_10m"][hour_idx],
+            "temperature": data["hourly"]["temperature_2m"][idx],
+            "visibility": data["hourly"]["visibility"][idx],
+            "precipitation": data["hourly"]["precipitation"][idx],
+            "wind_speed": data["hourly"]["windspeed_10m"][idx],
         }
 
         features = derive_features(raw)
-
         w["data"] = {**raw, **features}
 
-    # 5️⃣ Mise à jour des vols
+        # Be gentle with free API
+        time.sleep(0.5)
+
+    # --------------------------------------------------------------
+    # 5️⃣ Update flights
+    # --------------------------------------------------------------
+
     for f in flights:
         updates = {}
 
@@ -157,20 +211,20 @@ def main():
             if not w or not w["data"]:
                 continue
 
-            prefix = "dep" if phase == "DEP" else "arr"
+            p = "dep" if phase == "DEP" else "arr"
             d = w["data"]
 
             updates.update({
-                f"{prefix}_temperature": d["temperature"],
-                f"{prefix}_visibility": d["visibility"],
-                f"{prefix}_precipitation": d["precipitation"],
-                f"{prefix}_wind_speed": d["wind_speed"],
+                f"{p}_temperature": d["temperature"],
+                f"{p}_visibility": d["visibility"],
+                f"{p}_precipitation": d["precipitation"],
+                f"{p}_wind_speed": d["wind_speed"],
 
-                f"{prefix}_is_rain": d["is_rain"],
-                f"{prefix}_is_fog": d["is_fog"],
-                f"{prefix}_is_icing": d["is_icing"],
-                f"{prefix}_is_strong_wind": d["is_strong_wind"],
-                f"{prefix}_weather_severity": d["severity"],
+                f"{p}_is_rain": d["is_rain"],
+                f"{p}_is_fog": d["is_fog"],
+                f"{p}_is_icing": d["is_icing"],
+                f"{p}_is_strong_wind": d["is_strong_wind"],
+                f"{p}_weather_severity": d["severity"],
             })
 
         if updates:
@@ -180,7 +234,7 @@ def main():
                 .eq("dep_time", f["dep_time"]) \
                 .execute()
 
-    print("Weather + features successfully added")
+    print("Weather enrichment completed successfully")
 
 
 if __name__ == "__main__":
