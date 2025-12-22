@@ -15,6 +15,8 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 
+MAX_CALLS = 40
+
 # ------------------------------------------------------------------
 # Utils
 # ------------------------------------------------------------------
@@ -166,13 +168,16 @@ def main():
     # --------------------------------------------------------------
     # 4️⃣ Call Open-Meteo (batch, robust)
     # --------------------------------------------------------------
+    weather_items = list(weather_cache.items())[:MAX_CALLS]
 
-    for key, w in weather_cache.items():
+    for key, w in weather_items:
         date = w["dt"].date().isoformat()
         data = fetch_weather(w["lat"], w["lon"], date)
 
         if not data:
+            w["data"] = "FAILED"
             continue
+
 
         hour_str = open_meteo_hour_str(w["dt"])
         if hour_str not in data["hourly"]["time"]:
@@ -181,11 +186,12 @@ def main():
         idx = data["hourly"]["time"].index(hour_str)
 
         raw = {
-            "temperature": data["hourly"]["temperature_2m"][idx],
-            "visibility": data["hourly"]["visibility"][idx],
-            "precipitation": data["hourly"]["precipitation"][idx],
-            "wind_speed": data["hourly"]["windspeed_10m"][idx],
+            "temperature": float(data["hourly"]["temperature_2m"][idx]),
+            "visibility": int(data["hourly"]["visibility"][idx]) if data["hourly"]["visibility"][idx] is not None else None,
+            "precipitation": float(data["hourly"]["precipitation"][idx]),
+            "wind_speed": float(data["hourly"]["windspeed_10m"][idx]),
         }
+
 
         features = derive_features(raw)
         w["data"] = {**raw, **features}
@@ -208,8 +214,10 @@ def main():
 
             dt = round_to_hour(parser.isoparse(time_utc))
             w = weather_cache.get((icao, dt))
-            if not w or not w["data"]:
-                continue
+
+            if not w or w["data"] in (None, "FAILED"):
+            continue
+
 
             p = "dep" if phase == "DEP" else "arr"
             d = w["data"]
