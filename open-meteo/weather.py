@@ -216,7 +216,7 @@ def main():
             w = weather_cache.get((icao, dt))
 
             if not w or w["data"] in (None, "FAILED"):
-            continue
+                continue
 
 
             p = "dep" if phase == "DEP" else "arr"
