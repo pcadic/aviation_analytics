@@ -1,16 +1,26 @@
 import streamlit as st
+import pandas as pd
+from supabase import create_client
 
 st.set_page_config(page_title="Aviation Analytics", layout="wide")
 
-st.title("✈️ Aviation Analytics – Vancouver (YVR)")
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
 
-st.markdown("""
-Welcome to my air traffic analysis project around Vancouver Airport (CYVR).
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-Data:
-- AirLabs (real-time flights & flight information)
-- Open-Meteo (departure/arrival weather conditions)
-- Storage: Supabase
-""")
+@st.cache_data(ttl=3600)
+def load_flights(limit=2000):
+    res = supabase.table("flights_airlabs") \
+        .select("*") \
+        .limit(limit) \
+        .execute()
+    return pd.DataFrame(res.data)
 
-st.success("🚀 Streamlit fonctionne correctement")
+st.title("✈️ Aviation Analytics – Vancouver (CYVR)")
+
+df = load_flights()
+
+st.metric("Nombre de vols analysés", len(df))
+
+st.dataframe(df.head(50), use_container_width=True)
