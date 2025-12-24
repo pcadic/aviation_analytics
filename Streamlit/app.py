@@ -23,4 +23,19 @@ df = load_flights()
 
 st.metric("Nombre de vols analysés", len(df))
 
-st.dataframe(df.head(50), use_container_width=True)
+--st.dataframe(df.head(50), use_container_width=True)
+import plotly.express as px
+
+if "dep_delayed" in df.columns:
+    df["dep_hour"] = pd.to_datetime(df["dep_time_utc"]).dt.hour
+
+    fig = px.box(
+        df,
+        x="dep_hour",
+        y="dep_delayed",
+        title="Retard au départ selon l'heure (UTC)",
+        labels={"dep_hour": "Heure de départ", "dep_delayed": "Retard (minutes)"}
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
