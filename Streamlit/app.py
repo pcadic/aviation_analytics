@@ -21,7 +21,7 @@ st.title("✈️ Aviation Analytics – Vancouver (CYVR)")
 
 df = load_flights()
 
-st.metric("Nombre de vols analysés", len(df))
+st.metric("Number of flights analyzed", len(df))
 
 #st.dataframe(df.head(50), use_container_width=True)
 import plotly.express as px
@@ -33,8 +33,8 @@ if "dep_delayed" in df.columns:
         df,
         x="dep_hour",
         y="dep_delayed",
-        title="Retard au départ selon l'heure (UTC)",
-        labels={"dep_hour": "Heure de départ", "dep_delayed": "Retard (minutes)"}
+        title="Delay at departure depending per time (UTC)",
+        labels={"dep_hour": "Departure time", "dep_delayed": "Delay (minutes)"}
     )
 
     st.plotly_chart(fig, use_container_width=True)
