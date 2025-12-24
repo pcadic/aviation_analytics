@@ -23,7 +23,7 @@ df = load_flights()
 
 st.metric("Nombre de vols analysés", len(df))
 
---st.dataframe(df.head(50), use_container_width=True)
+#st.dataframe(df.head(50), use_container_width=True)
 import plotly.express as px
 
 if "dep_delayed" in df.columns:
