@@ -167,11 +167,22 @@ origins = (
 fig_orig = px.bar(
     origins.sort_values(),
     orientation="h",
-    labels={"value": "Percentage (%)", "index": "Origin Country"},
-    title="Top Origin Countries (Arrivals to CYVR)",
-    text=origins.sort_values().round(2)
 )
-fig_orig.update_traces(texttemplate="%{text} %", textposition="outside")
-fig_orig.update_layout(xaxis_title="Percentage (%)")
+
+# Format du texte affiché sur les barres
+fig_orig.update_traces(
+    text=origins.sort_values().round(2).astype(str) + " %",
+    textposition="outside",
+    hovertemplate="%{y} : %{x:.2f} %<extra></extra>"
+)
+
+# Nettoyage visuel
+fig_orig.update_layout(
+    title="Top Origin Countries (Arrivals to CYVR)",
+    xaxis_title="Percentage (%)",
+    yaxis_title="",                 # ✅ supprime "dep_country"
+    showlegend=False,
+)
 
 st.plotly_chart(fig_orig, use_container_width=True)
+
