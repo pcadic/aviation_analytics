@@ -1,192 +1,177 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 from supabase import create_client
 import os
 
-# --------------------------------------------------
-# PAGE CONFIG
-# --------------------------------------------------
+# -----------------------------
+# CONFIG
+# -----------------------------
 st.set_page_config(
-    page_title="Aviation Overview",
+    page_title="Airport Overview",
     page_icon="✈️",
     layout="wide"
 )
 
-st.markdown("""
-<style>
-    h1 { font-size: 2.2rem; }
-    h2 { margin-top: 2rem; }
-    .block-container { padding-top: 2rem; }
-</style>
-""", unsafe_allow_html=True)
-
-st.title("✈️ Aviation Traffic Overview")
-st.caption("Vancouver International Airport — Data Analytics Dashboard")
-
-# --------------------------------------------------
-# SUPABASE CONNECTION
-# --------------------------------------------------
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --------------------------------------------------
+# -----------------------------
 # LOAD DATA
-# --------------------------------------------------
-@st.cache_data(ttl=3600)
+# -----------------------------
+@st.cache_data
 def load_data():
-    res = supabase.table("flights_airlabs").select("*").execute()
-    return pd.DataFrame(res.data)
+    data = supabase.table("flights_airlabs").select("*").execute()
+    df = pd.DataFrame(data.data)
+    return df
 
 df = load_data()
 
-if df.empty:
-    st.warning("No data available yet.")
-    st.stop()
+st.title("✈️ Airport Overview — Vancouver (CYVR)")
+st.caption("Operational overview based on live flight & weather data")
 
-df.columns = df.columns.str.lower()
-
-# --------------------------------------------------
-# FEATURE ENGINEERING
-# --------------------------------------------------
-# --- CLEAN COUNTRIES ---
+# -----------------------------
+# CLEANING
+# -----------------------------
 df["dep_country"] = df["dep_country"].astype(str).str.strip()
 df["arr_country"] = df["arr_country"].astype(str).str.strip()
 
-# --- DOMESTIC FLIGHTS ---
+df["dep_icao"] = df["dep_icao"].astype(str)
+df["arr_icao"] = df["arr_icao"].astype(str)
+
+df["delay"] = df["arr_delayed"].fillna(0)
+
+# -----------------------------
+# DOMESTIC VS INTERNATIONAL
+# -----------------------------
 df["is_domestic"] = (
     ((df["dep_icao"] == "CYVR") & (df["arr_country"] == "Canada")) |
     ((df["arr_icao"] == "CYVR") & (df["dep_country"] == "Canada"))
 )
 
-domestic_pct = round(df["is_domestic"].mean() * 100, 1)
+domestic_pct = round(df["is_domestic"].mean() * 100, 2)
+international_pct = round(100 - domestic_pct, 2)
 
-# --- AVG FLIGHTS PER HOUR ---
-df["dep_time"] = pd.to_datetime(df.get("dep_time"), errors="coerce")
+# -----------------------------
+# FLIGHTS PER HOUR
+# -----------------------------
 df["hour"] = pd.to_datetime(df["dep_time"], errors="coerce").dt.floor("H")
 avg_flights_per_hour = round(len(df) / df["hour"].nunique(), 2)
 
-# --- ON TIME ---
-df["is_departure"] = df.get("dep_icao", "") == "CYVR"
-df["is_arrival"] = df.get("arr_icao", "") == "CYVR"
+# -----------------------------
+# ON-TIME
+# -----------------------------
+on_time_pct = round((df["delay"] <= 15).mean() * 100, 2)
 
-df["delay"] = df.get("arr_delayed", 0).fillna(0)
-on_time_pct = round((df["delay"] <= 15).mean() * 100, 1)
-
-
-
-
-
-# --------------------------------------------------
-# KPI CALCULATION
-# --------------------------------------------------
-hours_covered = df["hour"].nunique()
-avg_flights_per_hour = round(len(df) / hours_covered, 2) if hours_covered else 0
-
-domestic_pct = round(df["is_domestic"].mean() * 100, 1)
-on_time_pct = round((df["delay"] <= 15).mean() * 100, 1)
-
-# --------------------------------------------------
+# -----------------------------
 # KPI DISPLAY
-# --------------------------------------------------
-st.subheader("📊 Key Performance Indicators")
+# -----------------------------
+st.subheader("📊 Key Operational Indicators")
 
-col1, col2, col3 = st.columns(3)
+k1, k2, k3 = st.columns(3)
 
-with col1:
-    st.metric("✈️ Avg Flights / Hour", avg_flights_per_hour)
-
-with col2:
-    st.metric("🌍 Domestic Flights", f"{domestic_pct}%")
-
-with col3:
-    st.metric("⏱ On-Time Flights", f"{on_time_pct}%")
+k1.metric("✈️ Avg Flights / Hour", avg_flights_per_hour)
+k2.metric("🌍 Domestic Flights", f"{domestic_pct:.2f}%")
+k3.metric("⏱ On-Time Flights", f"{on_time_pct:.2f}%")
 
 st.divider()
 
-# --------------------------------------------------
-# TRAFFIC OVERVIEW
-# --------------------------------------------------
-st.subheader("✈️ Traffic Overview")
+# ============================================================
+# GRAPHS
+# ============================================================
 
-col1, col2 = st.columns(2)
+st.subheader("📈 Traffic & Fleet Overview")
 
-with col1:
-    st.markdown("### Top Airlines")
-    if "airline_name" in df.columns:
-        airlines = (
-            df["airline_name"]
-                .value_counts(normalize=True)
-                .sort_values(ascending=False)
-                .head(10)
-                .sort_values()
-                * 100
-        )
-        st.bar_chart(airlines)
-    else:
-        st.info("Airline data not available.")
+# -----------------------------
+# AIRLINES
+# -----------------------------
+airlines = (
+    df["airline_name"]
+    .value_counts(normalize=True)
+    .mul(100)
+    .sort_values(ascending=False)
+    .head(10)
+)
 
+fig_airlines = px.bar(
+    airlines.sort_values(),
+    orientation="h",
+    labels={"value": "Percentage (%)", "index": "Airline"},
+    title="Top Airlines (Share of Flights)",
+    text=airlines.sort_values().round(2)
+)
+fig_airlines.update_traces(texttemplate="%{text} %", textposition="outside")
+fig_airlines.update_layout(xaxis_title="Percentage (%)")
 
-st.bar_chart(airlines)
+st.plotly_chart(fig_airlines, use_container_width=True)
 
-with col2:
-    st.markdown("### Aircraft Types")
-    if "aircraft_icao" in df.columns:
-        aircrafts = (
-            df["aircraft_icao"]
-                .value_counts(normalize=True)
-                .sort_values(ascending=False)
-                .head(10)
-                .sort_values()
-                * 100
-        )
-        st.bar_chart(aircrafts)
-    else:
-        st.info("Aircraft data not available.")
+# -----------------------------
+# AIRCRAFT TYPES
+# -----------------------------
+aircrafts = (
+    df["aircraft_icao"]
+    .value_counts(normalize=True)
+    .mul(100)
+    .sort_values(ascending=False)
+    .head(10)
+)
 
-# --------------------------------------------------
-# ROUTES ANALYSIS
-# --------------------------------------------------
-st.subheader("🌍 Route Distribution")
+fig_aircraft = px.bar(
+    aircrafts.sort_values(),
+    orientation="h",
+    labels={"value": "Percentage (%)", "index": "Aircraft Type"},
+    title="Most Frequent Aircraft Types",
+    text=aircrafts.sort_values().round(2)
+)
+fig_aircraft.update_traces(texttemplate="%{text} %", textposition="outside")
+fig_aircraft.update_layout(xaxis_title="Percentage (%)")
 
-col1, col2 = st.columns(2)
+st.plotly_chart(fig_aircraft, use_container_width=True)
 
-with col1:
-    st.markdown("### Destination Countries (Departures)")
-    if "arr_country" in df.columns:
-        dest = (
-            df[df["dep_icao"] == "CYVR"]["arr_country"]
-            .value_counts(normalize=True)
-            .sort_values(ascending=False)
-            .head(10)
-            .sort_values()
-            * 100
-        )
-        st.bar_chart(dest)
-    else:
-        st.info("No destination data.")
+# -----------------------------
+# DESTINATIONS FROM CYVR
+# -----------------------------
+destinations = (
+    df[df["dep_icao"] == "CYVR"]["arr_country"]
+    .value_counts(normalize=True)
+    .mul(100)
+    .sort_values(ascending=False)
+    .head(10)
+)
 
-with col2:
-    st.markdown("### Origin Countries (Arrivals)")
-    if "dep_country" in df.columns:
-        origin = (
-            df[df["arr_icao"] == "CYVR"]["dep_country"]
-                .value_counts(normalize=True)
-                .sort_values(ascending=False)
-                .head(10)
-                .sort_values()
-                * 100
-        )
-        st.bar_chart(origin)
-    else:
-        st.info("No origin data.")
+fig_dest = px.bar(
+    destinations.sort_values(),
+    orientation="h",
+    labels={"value": "Percentage (%)", "index": "Destination Country"},
+    title="Top Destination Countries (Departures from CYVR)",
+    text=destinations.sort_values().round(2)
+)
+fig_dest.update_traces(texttemplate="%{text} %", textposition="outside")
+fig_dest.update_layout(xaxis_title="Percentage (%)")
 
-# --------------------------------------------------
-# FOOTER
-# --------------------------------------------------
-st.caption("""
-Data source: AirLabs & Open-Meteo  
-Automated ETL via GitHub Actions  
-Portfolio Project – Aviation Analytics
-""")
+st.plotly_chart(fig_dest, use_container_width=True)
+
+# -----------------------------
+# ORIGINS TO CYVR
+# -----------------------------
+origins = (
+    df[df["arr_icao"] == "CYVR"]["dep_country"]
+    .value_counts(normalize=True)
+    .mul(100)
+    .sort_values(ascending=False)
+    .head(10)
+)
+
+fig_orig = px.bar(
+    origins.sort_values(),
+    orientation="h",
+    labels={"value": "Percentage (%)", "index": "Origin Country"},
+    title="Top Origin Countries (Arrivals to CYVR)",
+    text=origins.sort_values().round(2)
+)
+fig_orig.update_traces(texttemplate="%{text} %", textposition="outside")
+fig_orig.update_layout(xaxis_title="Percentage (%)")
+
+st.plotly_chart(fig_orig, use_container_width=True)
