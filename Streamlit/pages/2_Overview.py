@@ -33,6 +33,10 @@ df = load_data()
 # -----------------------------------
 # SAFETY CHECK
 # -----------------------------------
+st.write("Columns:", df.columns.tolist())
+st.write("Rows:", len(df))
+st.dataframe(df.head())
+
 if df.empty:
     st.warning("No data available yet.")
     st.stop()
