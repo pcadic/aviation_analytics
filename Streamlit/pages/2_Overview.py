@@ -3,26 +3,37 @@ import pandas as pd
 from supabase import create_client
 import os
 
+# --------------------------------------------------
+# PAGE CONFIG
+# --------------------------------------------------
 st.set_page_config(
     page_title="Aviation Overview",
     page_icon="✈️",
     layout="wide"
 )
 
-st.title("✈️ Aviation Traffic Overview")
-st.caption("Vancouver International Airport – Data Analytics Dashboard")
+st.markdown("""
+<style>
+    h1 { font-size: 2.2rem; }
+    h2 { margin-top: 2rem; }
+    .block-container { padding-top: 2rem; }
+</style>
+""", unsafe_allow_html=True)
 
-# -----------------------------------
-# SUPABASE
-# -----------------------------------
+st.title("✈️ Aviation Traffic Overview")
+st.caption("Vancouver International Airport — Data Analytics Dashboard")
+
+# --------------------------------------------------
+# SUPABASE CONNECTION
+# --------------------------------------------------
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# -----------------------------------
+# --------------------------------------------------
 # LOAD DATA
-# -----------------------------------
+# --------------------------------------------------
 @st.cache_data(ttl=3600)
 def load_data():
     res = supabase.table("flights_airlabs").select("*").execute()
@@ -30,130 +41,126 @@ def load_data():
 
 df = load_data()
 
-# -----------------------------------
-# SAFETY CHECK
-# -----------------------------------
-# st.write("Columns:", df.columns.tolist())
-# st.write("Rows:", len(df))
-# st.dataframe(df.head())
-
-# test = supabase.table("flights_airlabs").select("dep_icao").limit(5).execute()
-# st.write(test.data)
-
-
 if df.empty:
     st.warning("No data available yet.")
     st.stop()
 
-# Normalize column names (safety)
 df.columns = df.columns.str.lower()
 
-# -----------------------------------
-# SAFE FEATURE ENGINEERING
-# -----------------------------------
-if "dep_icao" in df.columns:
-    df["is_departure"] = df["dep_icao"] == "CYVR"
-else:
-    df["is_departure"] = False
+# --------------------------------------------------
+# FEATURE ENGINEERING
+# --------------------------------------------------
+df["dep_time"] = pd.to_datetime(df.get("dep_time"), errors="coerce")
+df["hour"] = df["dep_time"].dt.floor("H")
 
-if "arr_icao" in df.columns:
-    df["is_arrival"] = df["arr_icao"] == "CYVR"
-else:
-    df["is_arrival"] = False
+df["is_departure"] = df.get("dep_icao", "") == "CYVR"
+df["is_arrival"] = df.get("arr_icao", "") == "CYVR"
 
-if "arr_delayed" in df.columns:
-    df["delay"] = df["arr_delayed"].fillna(0)
-else:
-    df["delay"] = 0
+df["delay"] = df.get("arr_delayed", 0).fillna(0)
 
-# -----------------------------------
-# KPI SECTION
-# -----------------------------------
-st.subheader("📊 Key Metrics")
+df["is_domestic"] = (
+    (df.get("dep_country") == "Canada") |
+    (df.get("arr_country") == "Canada")
+)
 
-col1, col2, col3, col4 = st.columns(4)
+# --------------------------------------------------
+# KPI CALCULATION
+# --------------------------------------------------
+hours_covered = df["hour"].nunique()
+avg_flights_per_hour = round(len(df) / hours_covered, 2) if hours_covered else 0
+
+domestic_pct = round(df["is_domestic"].mean() * 100, 1)
+on_time_pct = round((df["delay"] <= 15).mean() * 100, 1)
+
+# --------------------------------------------------
+# KPI DISPLAY
+# --------------------------------------------------
+st.subheader("📊 Key Performance Indicators")
+
+col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.metric("✈️ Total Flights", len(df))
+    st.metric("✈️ Avg Flights / Hour", avg_flights_per_hour)
 
 with col2:
-    st.metric("🛫 Departures %",
-              f"{round(df['is_departure'].mean()*100,1)}%")
+    st.metric("🌍 Domestic Flights", f"{domestic_pct}%")
 
 with col3:
-    st.metric("🛬 Arrivals %",
-              f"{round(df['is_arrival'].mean()*100,1)}%")
-
-with col4:
-    st.metric("⏱ Avg Delay (min)",
-              round(df["delay"].mean(), 1))
+    st.metric("⏱ On-Time Flights", f"{on_time_pct}%")
 
 st.divider()
 
-# -----------------------------------
+# --------------------------------------------------
 # TRAFFIC OVERVIEW
-# -----------------------------------
-st.subheader("Traffic Overview")
+# --------------------------------------------------
+st.subheader("✈️ Traffic Overview")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("### ✈️ Top Airlines")
+    st.markdown("### Top Airlines")
     if "airline_name" in df.columns:
-        airline_share = (
+        airlines = (
             df["airline_name"]
             .value_counts(normalize=True)
-            .head(10) * 100
+            .head(10)
+            .sort_values(ascending=True) * 100
         )
-        st.bar_chart(airline_share)
+        st.bar_chart(airlines)
     else:
-        st.info("Airline data not available yet.")
+        st.info("Airline data not available.")
 
 with col2:
-    st.markdown("### 🛩 Aircraft Types")
+    st.markdown("### Aircraft Types")
     if "aircraft_icao" in df.columns:
-        aircraft_share = (
+        aircrafts = (
             df["aircraft_icao"]
             .value_counts(normalize=True)
-            .head(10) * 100
+            .head(10)
+            .sort_values(ascending=True) * 100
         )
-        st.bar_chart(aircraft_share)
+        st.bar_chart(aircrafts)
     else:
-        st.info("Aircraft data not available yet.")
+        st.info("Aircraft data not available.")
 
-# -----------------------------------
-# DELAYS
-# -----------------------------------
-st.subheader("Operational Performance")
+# --------------------------------------------------
+# ROUTES ANALYSIS
+# --------------------------------------------------
+st.subheader("🌍 Route Distribution")
 
-if "airline_name" in df.columns:
-    delay_by_airline = (
-        df.groupby("airline_name")["delay"]
-        .mean()
-        .sort_values(ascending=False)
-        .head(10)
-    )
-    st.bar_chart(delay_by_airline)
-else:
-    st.info("Delay analysis not available.")
+col1, col2 = st.columns(2)
 
-# -----------------------------------
-# ROUTES
-# -----------------------------------
-st.subheader("Top Destinations")
+with col1:
+    st.markdown("### Destination Countries (Departures)")
+    if "arr_country" in df.columns:
+        dest = (
+            df[df["dep_icao"] == "CYVR"]["arr_country"]
+            .value_counts(normalize=True)
+            .head(10)
+            .sort_values(ascending=True) * 100
+        )
+        st.bar_chart(dest)
+    else:
+        st.info("No destination data.")
 
-if "arr_icao" in df.columns:
-    top_routes = (
-        df["arr_icao"]
-        .value_counts(normalize=True)
-        .head(10) * 100
-    )
-    st.bar_chart(top_routes)
-else:
-    st.info("Destination data not available.")
+with col2:
+    st.markdown("### Origin Countries (Arrivals)")
+    if "dep_country" in df.columns:
+        origin = (
+            df[df["arr_icao"] == "CYVR"]["dep_country"]
+            .value_counts(normalize=True)
+            .head(10)
+            .sort_values(ascending=True) * 100
+        )
+        st.bar_chart(origin)
+    else:
+        st.info("No origin data.")
 
+# --------------------------------------------------
+# FOOTER
+# --------------------------------------------------
 st.caption("""
-Data source: AirLabs + Open-Meteo  
-Automated pipeline – GitHub Actions  
-Portfolio project – Aviation Analytics
+Data source: AirLabs & Open-Meteo  
+Automated ETL via GitHub Actions  
+Portfolio Project – Aviation Analytics
 """)
