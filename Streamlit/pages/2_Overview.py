@@ -142,16 +142,24 @@ destinations = (
 )
 
 fig_dest = px.bar(
-    destinations.sort_values(),
-    orientation="h",
-    labels={"value": "Percentage (%)", "index": "Destination Country"},
-    title="Top Destination Countries (Departures from CYVR)",
-    text=destinations.sort_values().round(2)
+    destinations.sort_values(),  # important pour l’ordre visuel
+    orientation="h"
 )
-fig_dest.update_traces(texttemplate="%{text} %", textposition="outside")
-fig_dest.update_layout(xaxis_title="Percentage (%)")
+
+fig_dest.update_traces(
+    hovertemplate="%{y} : %{x:.2f} %<extra></extra>"
+)
+
+fig_dest.update_layout(
+    title="Top Destination Countries (Departures from CYVR)",
+    xaxis_title="Percentage (%)",
+    yaxis_title="",
+    hovermode="y unified",
+    showlegend=False
+)
 
 st.plotly_chart(fig_dest, use_container_width=True)
+
 
 # -----------------------------
 # ORIGINS TO CYVR
