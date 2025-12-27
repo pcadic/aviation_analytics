@@ -37,6 +37,10 @@ st.write("Columns:", df.columns.tolist())
 st.write("Rows:", len(df))
 st.dataframe(df.head())
 
+test = supabase.table("flights_airlabs").select("dep_icao").limit(5).execute()
+st.write(test.data)
+
+
 if df.empty:
     st.warning("No data available yet.")
     st.stop()
