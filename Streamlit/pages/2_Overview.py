@@ -50,18 +50,33 @@ df.columns = df.columns.str.lower()
 # --------------------------------------------------
 # FEATURE ENGINEERING
 # --------------------------------------------------
-df["dep_time"] = pd.to_datetime(df.get("dep_time"), errors="coerce")
-df["hour"] = df["dep_time"].dt.floor("H")
+# --- CLEAN COUNTRIES ---
+df["dep_country"] = df["dep_country"].astype(str).str.strip()
+df["arr_country"] = df["arr_country"].astype(str).str.strip()
 
+# --- DOMESTIC FLIGHTS ---
+df["is_domestic"] = (
+    ((df["dep_icao"] == "CYVR") & (df["arr_country"] == "Canada")) |
+    ((df["arr_icao"] == "CYVR") & (df["dep_country"] == "Canada"))
+)
+
+domestic_pct = round(df["is_domestic"].mean() * 100, 1)
+
+# --- AVG FLIGHTS PER HOUR ---
+df["dep_time"] = pd.to_datetime(df.get("dep_time"), errors="coerce")
+df["hour"] = pd.to_datetime(df["dep_time"], errors="coerce").dt.floor("H")
+avg_flights_per_hour = round(len(df) / df["hour"].nunique(), 2)
+
+# --- ON TIME ---
 df["is_departure"] = df.get("dep_icao", "") == "CYVR"
 df["is_arrival"] = df.get("arr_icao", "") == "CYVR"
 
 df["delay"] = df.get("arr_delayed", 0).fillna(0)
+on_time_pct = round((df["delay"] <= 15).mean() * 100, 1)
 
-df["is_domestic"] = (
-    (df.get("dep_country") == "Canada") |
-    (df.get("arr_country") == "Canada")
-)
+
+
+
 
 # --------------------------------------------------
 # KPI CALCULATION
@@ -102,22 +117,29 @@ with col1:
     if "airline_name" in df.columns:
         airlines = (
             df["airline_name"]
-            .value_counts(normalize=True)
-            .head(10)
-            .sort_values(ascending=True) * 100
+                .value_counts(normalize=True)
+                .sort_values(ascending=False)
+                .head(10)
+                .sort_values()
+                * 100
         )
         st.bar_chart(airlines)
     else:
         st.info("Airline data not available.")
+
+
+st.bar_chart(airlines)
 
 with col2:
     st.markdown("### Aircraft Types")
     if "aircraft_icao" in df.columns:
         aircrafts = (
             df["aircraft_icao"]
-            .value_counts(normalize=True)
-            .head(10)
-            .sort_values(ascending=True) * 100
+                .value_counts(normalize=True)
+                .sort_values(ascending=False)
+                .head(10)
+                .sort_values()
+                * 100
         )
         st.bar_chart(aircrafts)
     else:
@@ -136,8 +158,10 @@ with col1:
         dest = (
             df[df["dep_icao"] == "CYVR"]["arr_country"]
             .value_counts(normalize=True)
+            .sort_values(ascending=False)
             .head(10)
-            .sort_values(ascending=True) * 100
+            .sort_values()
+            * 100
         )
         st.bar_chart(dest)
     else:
@@ -148,9 +172,11 @@ with col2:
     if "dep_country" in df.columns:
         origin = (
             df[df["arr_icao"] == "CYVR"]["dep_country"]
-            .value_counts(normalize=True)
-            .head(10)
-            .sort_values(ascending=True) * 100
+                .value_counts(normalize=True)
+                .sort_values(ascending=False)
+                .head(10)
+                .sort_values()
+                * 100
         )
         st.bar_chart(origin)
     else:
