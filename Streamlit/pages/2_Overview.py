@@ -171,8 +171,6 @@ fig_orig = px.bar(
 
 # Format du texte affiché sur les barres
 fig_orig.update_traces(
-    text=origins.sort_values().round(2).astype(str) + " %",
-    textposition="outside",
     hovertemplate="%{y} : %{x:.2f} %<extra></extra>"
 )
 
@@ -182,6 +180,7 @@ fig_orig.update_layout(
     xaxis_title="Percentage (%)",
     yaxis_title="",                 # ✅ supprime "dep_country"
     showlegend=False,
+    hovermode="closest"   # 👈 tooltip suit bien la souris
 )
 
 st.plotly_chart(fig_orig, use_container_width=True)
