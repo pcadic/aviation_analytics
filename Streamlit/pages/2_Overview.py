@@ -3,9 +3,6 @@ import pandas as pd
 from supabase import create_client
 import os
 
-# -------------------------------
-# CONFIG
-# -------------------------------
 st.set_page_config(
     page_title="Aviation Overview",
     page_icon="✈️",
@@ -15,37 +12,57 @@ st.set_page_config(
 st.title("✈️ Aviation Traffic Overview")
 st.caption("Vancouver International Airport – Data Analytics Dashboard")
 
-# -------------------------------
+# -----------------------------------
 # SUPABASE
-# -------------------------------
+# -----------------------------------
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# -------------------------------
+# -----------------------------------
 # LOAD DATA
-# -------------------------------
+# -----------------------------------
 @st.cache_data(ttl=3600)
 def load_data():
-    data = supabase.table("flights_airlabs") \
-        .select("*") \
-        .execute()
-    return pd.DataFrame(data.data)
+    res = supabase.table("flights_airlabs").select("*").execute()
+    return pd.DataFrame(res.data)
 
 df = load_data()
 
-# -------------------------------
-# BASIC CLEANING
-# -------------------------------
-df["is_departure"] = df["dep_icao"] == "CYVR"
-df["is_arrival"] = df["arr_icao"] == "CYVR"
+# -----------------------------------
+# SAFETY CHECK
+# -----------------------------------
+if df.empty:
+    st.warning("No data available yet.")
+    st.stop()
 
-df["delay"] = df["arr_delayed"].fillna(0)
+# Normalize column names (safety)
+df.columns = df.columns.str.lower()
 
-# -------------------------------
+# -----------------------------------
+# SAFE FEATURE ENGINEERING
+# -----------------------------------
+if "dep_icao" in df.columns:
+    df["is_departure"] = df["dep_icao"] == "CYVR"
+else:
+    df["is_departure"] = False
+
+if "arr_icao" in df.columns:
+    df["is_arrival"] = df["arr_icao"] == "CYVR"
+else:
+    df["is_arrival"] = False
+
+if "arr_delayed" in df.columns:
+    df["delay"] = df["arr_delayed"].fillna(0)
+else:
+    df["delay"] = 0
+
+# -----------------------------------
 # KPI SECTION
-# -------------------------------
+# -----------------------------------
+st.subheader("📊 Key Metrics")
+
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
@@ -65,66 +82,70 @@ with col4:
 
 st.divider()
 
-# -------------------------------
-# TRAFFIC DISTRIBUTION
-# -------------------------------
+# -----------------------------------
+# TRAFFIC OVERVIEW
+# -----------------------------------
 st.subheader("Traffic Overview")
 
 col1, col2 = st.columns(2)
 
 with col1:
     st.markdown("### ✈️ Top Airlines")
-    airline_share = (
-        df["airline_name"]
-        .value_counts(normalize=True)
-        .head(10)
-        * 100
-    )
-    st.bar_chart(airline_share)
+    if "airline_name" in df.columns:
+        airline_share = (
+            df["airline_name"]
+            .value_counts(normalize=True)
+            .head(10) * 100
+        )
+        st.bar_chart(airline_share)
+    else:
+        st.info("Airline data not available yet.")
 
 with col2:
     st.markdown("### 🛩 Aircraft Types")
-    aircraft_share = (
-        df["aircraft_icao"]
-        .value_counts(normalize=True)
-        .head(10)
-        * 100
-    )
-    st.bar_chart(aircraft_share)
+    if "aircraft_icao" in df.columns:
+        aircraft_share = (
+            df["aircraft_icao"]
+            .value_counts(normalize=True)
+            .head(10) * 100
+        )
+        st.bar_chart(aircraft_share)
+    else:
+        st.info("Aircraft data not available yet.")
 
-# -------------------------------
+# -----------------------------------
 # DELAYS
-# -------------------------------
+# -----------------------------------
 st.subheader("Operational Performance")
 
-delay_by_airline = (
-    df.groupby("airline_name")["delay"]
-    .mean()
-    .sort_values(ascending=False)
-    .head(10)
-)
+if "airline_name" in df.columns:
+    delay_by_airline = (
+        df.groupby("airline_name")["delay"]
+        .mean()
+        .sort_values(ascending=False)
+        .head(10)
+    )
+    st.bar_chart(delay_by_airline)
+else:
+    st.info("Delay analysis not available.")
 
-st.markdown("### ⏱ Average Delay by Airline")
-st.bar_chart(delay_by_airline)
-
-# -------------------------------
+# -----------------------------------
 # ROUTES
-# -------------------------------
+# -----------------------------------
 st.subheader("Top Destinations")
 
-top_routes = (
-    df["arr_icao"]
-    .value_counts(normalize=True)
-    .head(10) * 100
-)
+if "arr_icao" in df.columns:
+    top_routes = (
+        df["arr_icao"]
+        .value_counts(normalize=True)
+        .head(10) * 100
+    )
+    st.bar_chart(top_routes)
+else:
+    st.info("Destination data not available.")
 
-st.bar_chart(top_routes)
-
-# -------------------------------
-# FOOTER
-# -------------------------------
 st.caption("""
 Data source: AirLabs + Open-Meteo  
-Updated automatically via GitHub Actions  
-Built for data analytics portfolio
+Automated pipeline – GitHub Actions  
+Portfolio project – Aviation Analytics
 """)
