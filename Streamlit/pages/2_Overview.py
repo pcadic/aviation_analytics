@@ -177,19 +177,18 @@ fig_orig = px.bar(
     orientation="h"
 )
 
-# Display value at end of bar
 fig_orig.update_traces(
     text=origins.sort_values().round(2).astype(str) + " %",
-    textposition="outside",
-    hoverinfo="skip"  # ✅ disables tooltip completely
+    textposition="outside"
 )
 
-# Clean layout
 fig_orig.update_layout(
     title="Top Origin Countries (Arrivals to CYVR)",
     xaxis_title="Percentage (%)",
     yaxis_title="",
-    showlegend=False
+    showlegend=False,
+    hovermode=False   # ✅ suppression définitive de l’infobulle
 )
 
 st.plotly_chart(fig_orig, use_container_width=True)
+
