@@ -63,18 +63,49 @@ avg_flights_per_hour = round(len(df) / df["hour"].nunique(), 2)
 # -----------------------------
 # ON-TIME
 # -----------------------------
-on_time_pct = round((df["delay"] <= 15).mean() * 100, 2)
+# -----------------------------
+# FINAL DELAY CALCULATION
+# -----------------------------
+
+# Nettoyage des valeurs nulles
+df["dep_delay_clean"] = df["dep_delayed"].fillna(0)
+df["arr_delay_clean"] = df["arr_delayed"].fillna(0)
+
+# Delay final selon le type de vol
+df["final_delay"] = 0
+
+# Arrivées à CYVR → arr_delay
+df.loc[df["arr_icao"] == "CYVR", "final_delay"] = df.loc[
+    df["arr_icao"] == "CYVR", "arr_delay_clean"
+]
+
+# Départs de CYVR → dep_delay
+df.loc[df["dep_icao"] == "CYVR", "final_delay"] = df.loc[
+    df["dep_icao"] == "CYVR", "dep_delay_clean"
+]
+
+on_time_pct = round((df["final_delay"] <= 15).mean() * 100, 2)
+delayed_pct = round((df["final_delay"] > 15).mean() * 100, 2)
+# on_time_pct = round((df["delay"] <= 15).mean() * 100, 2)
 
 # -----------------------------
 # KPI DISPLAY
 # -----------------------------
 st.subheader("📊 Key Operational Indicators")
 
-k1, k2, k3 = st.columns(3)
+k1, k2, k3, k4 = st.columns(3)
 
 k1.metric("✈️ Avg Flights / Hour", avg_flights_per_hour)
 k2.metric("🌍 Domestic Flights", f"{domestic_pct:.2f}%")
 k3.metric("⏱ On-Time Flights", f"{on_time_pct:.2f}%")
+k4.metric("⏱ Delayed flights", f"{delayed_pct:.2f}%")
+
+st.caption(
+    "Delay computed using arrival delay for inbound flights "
+    "and departure delay for outbound flights (NULL treated as 0)."
+)
+
+
 
 st.divider()
 
