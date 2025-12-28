@@ -93,7 +93,7 @@ delayed_pct = round((df["final_delay"] > 15).mean() * 100, 2)
 # -----------------------------
 st.subheader("📊 Key Operational Indicators")
 
-k1, k2, k3, k4 = st.columns(3)
+k1, k2, k3, k4 = st.columns(4)
 
 k1.metric("✈️ Avg Flights / Hour", avg_flights_per_hour)
 k2.metric("🌍 Domestic Flights", f"{domestic_pct:.2f}%")
