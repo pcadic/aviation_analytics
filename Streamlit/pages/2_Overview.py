@@ -142,23 +142,25 @@ destinations = (
 )
 
 fig_dest = px.bar(
-    destinations.sort_values(),  # important pour l’ordre visuel
+    destinations.sort_values(),   # keep visual order
     orientation="h"
 )
 
 fig_dest.update_traces(
-    hovertemplate="%{y} : %{x:.2f} %<extra></extra>"
+    text=destinations.sort_values().round(2).astype(str) + " %",
+    textposition="outside"
 )
 
 fig_dest.update_layout(
     title="Top Destination Countries (Departures from CYVR)",
     xaxis_title="Percentage (%)",
     yaxis_title="",
-    hovermode="y unified",
-    showlegend=False
+    showlegend=False,
+    hovermode=False   # ✅ disables tooltip completely
 )
 
 st.plotly_chart(fig_dest, use_container_width=True)
+
 
 
 # -----------------------------
