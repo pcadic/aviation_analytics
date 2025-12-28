@@ -87,8 +87,12 @@ st.subheader("📈 Traffic & Fleet Overview")
 # -----------------------------
 # AIRLINES
 # -----------------------------
+
 airlines = (
-    df["airline_name"]
+    df[
+        df["airline_name"].notna() &
+        (df["airline_name"] != "")
+    ]["airline_name"]
     .value_counts(normalize=True)
     .mul(100)
     .sort_values(ascending=False)
@@ -97,15 +101,28 @@ airlines = (
 
 fig_airlines = px.bar(
     airlines.sort_values(),
-    orientation="h",
-    labels={"value": "Percentage (%)", "index": "Airline"},
-    title="Top Airlines (Share of Flights)",
-    text=airlines.sort_values().round(2)
+    orientation="h"
 )
-fig_airlines.update_traces(texttemplate="%{text} %", textposition="outside")
-fig_airlines.update_layout(xaxis_title="Percentage (%)")
+
+# Affichage du % au bout de la barre
+fig_airlines.update_traces(
+    text=airlines.sort_values().round(2),
+    texttemplate="%{text} %",
+    textposition="outside",
+    hoverinfo="skip"   # ❌ supprime complètement le tooltip
+)
+
+# Nettoyage visuel
+fig_airlines.update_layout(
+    title="Top Airlines (Share of Flights)",
+    xaxis_title="Percentage (%)",
+    yaxis_title="",
+    showlegend=False,
+    hovermode=False
+)
 
 st.plotly_chart(fig_airlines, use_container_width=True)
+
 
 # -----------------------------
 # AIRCRAFT TYPES
@@ -137,7 +154,7 @@ fig_aircraft.update_traces(
 
 # Nettoyage visuel
 fig_aircraft.update_layout(
-    title="Most Frequent Aircraft Types",
+    title="Most Frequent Aircraft Types (icao code)",
     xaxis_title="Percentage (%)",
     yaxis_title="",
     showlegend=False,
