@@ -23,8 +23,8 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # -----------------------------
 @st.cache_data
 def load_data():
-    data = supabase.table("flights_airlabs").select("*").execute()
-    df = pd.DataFrame(data.data)
+    df = supabase.table("v_flights_enriched").select("*").execute().data
+    df = pd.DataFrame(df)
     return df
 
 df = load_data()
