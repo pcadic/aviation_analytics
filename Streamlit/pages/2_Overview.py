@@ -110,8 +110,12 @@ st.plotly_chart(fig_airlines, use_container_width=True)
 # -----------------------------
 # AIRCRAFT TYPES
 # -----------------------------
+
 aircrafts = (
-    df["aircraft_icao"]
+    df[
+        df["aircraft_icao"].notna() &
+        (df["aircraft_icao"] != "")
+    ]["aircraft_icao"]
     .value_counts(normalize=True)
     .mul(100)
     .sort_values(ascending=False)
@@ -120,15 +124,28 @@ aircrafts = (
 
 fig_aircraft = px.bar(
     aircrafts.sort_values(),
-    orientation="h",
-    labels={"value": "Percentage (%)", "index": "Aircraft Type"},
-    title="Most Frequent Aircraft Types",
-    text=aircrafts.sort_values().round(2)
+    orientation="h"
 )
-fig_aircraft.update_traces(texttemplate="%{text} %", textposition="outside")
-fig_aircraft.update_layout(xaxis_title="Percentage (%)")
+
+# Affichage du % au bout de la barre
+fig_aircraft.update_traces(
+    text=aircrafts.sort_values().round(2),
+    texttemplate="%{text} %",
+    textposition="outside",
+    hoverinfo="skip"   # ⬅️ SUPPRIME totalement le tooltip
+)
+
+# Nettoyage visuel
+fig_aircraft.update_layout(
+    title="Most Frequent Aircraft Types",
+    xaxis_title="Percentage (%)",
+    yaxis_title="",
+    showlegend=False,
+    hovermode=False
+)
 
 st.plotly_chart(fig_aircraft, use_container_width=True)
+
 
 # -----------------------------
 # DESTINATIONS FROM CYVR
