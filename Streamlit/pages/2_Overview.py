@@ -174,22 +174,22 @@ origins = (
 
 fig_orig = px.bar(
     origins.sort_values(),
-    orientation="h",
+    orientation="h"
 )
 
-# Format du texte affiché sur les barres
+# Display value at end of bar
 fig_orig.update_traces(
-    hovertemplate="%{y} : %{x:.2f} %<extra></extra>"
+    text=origins.sort_values().round(2).astype(str) + " %",
+    textposition="outside",
+    hoverinfo="skip"  # ✅ disables tooltip completely
 )
 
-# Nettoyage visuel
+# Clean layout
 fig_orig.update_layout(
     title="Top Origin Countries (Arrivals to CYVR)",
     xaxis_title="Percentage (%)",
-    yaxis_title="",                 # ✅ supprime "dep_country"
-    showlegend=False,
-    hovermode="closest"   # 👈 tooltip suit bien la souris
+    yaxis_title="",
+    showlegend=False
 )
 
 st.plotly_chart(fig_orig, use_container_width=True)
-
