@@ -134,7 +134,12 @@ st.plotly_chart(fig_aircraft, use_container_width=True)
 # DESTINATIONS FROM CYVR
 # -----------------------------
 destinations = (
-    df[df["dep_icao"] == "CYVR"]["arr_country"]
+    df[
+        (df["dep_icao"] == "CYVR") &
+        (df["arr_country"].notna()) &
+        (df["arr_country"] != "") & 
+        (df["dep_country"] != "Unknown")
+    ]["arr_country"]
     .value_counts(normalize=True)
     .mul(100)
     .sort_values(ascending=False)
@@ -167,7 +172,12 @@ st.plotly_chart(fig_dest, use_container_width=True)
 # ORIGINS TO CYVR
 # -----------------------------
 origins = (
-    df[df["arr_icao"] == "CYVR"]["dep_country"]
+    df[
+        (df["arr_icao"] == "CYVR") &
+        (df["dep_country"].notna()) &
+        (df["dep_country"] != "") & 
+        (df["arr_country"] != "Unknown")
+    ]["dep_country"]
     .value_counts(normalize=True)
     .mul(100)
     .sort_values(ascending=False)
