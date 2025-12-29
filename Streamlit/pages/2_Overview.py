@@ -41,18 +41,23 @@ df["arr_country"] = df["arr_country"].astype(str).str.strip()
 df["dep_icao"] = df["dep_icao"].astype(str)
 df["arr_icao"] = df["arr_icao"].astype(str)
 
-df["delay"] = df["arr_delayed"].fillna(0)
+#df["delay"] = df["arr_delayed"].fillna(0)
 
 # -----------------------------
 # DOMESTIC VS INTERNATIONAL
 # -----------------------------
+#df["is_domestic"] = (
+#    ((df["dep_icao"] == "CYVR") & (df["arr_country"] == "Canada")) |
+#    ((df["arr_icao"] == "CYVR") & (df["dep_country"] == "Canada"))
+#)
 df["is_domestic"] = (
-    ((df["dep_icao"] == "CYVR") & (df["arr_country"] == "Canada")) |
-    ((df["arr_icao"] == "CYVR") & (df["dep_country"] == "Canada"))
+    (df["dep_country_ref"] == "Canada") &
+    (df["arr_country_ref"] == "Canada")
 )
 
 domestic_pct = round(df["is_domestic"].mean() * 100, 2)
-international_pct = round(100 - domestic_pct, 2)
+international_pct = round((~df["is_domestic"]).mean() * 100, 2)
+
 
 # -----------------------------
 # FLIGHTS PER HOUR
@@ -93,16 +98,15 @@ delayed_pct = round((df["final_delay"] > 15).mean() * 100, 2)
 # -----------------------------
 st.subheader("📊 Key Operational Indicators")
 
-k1, k2, k3, k4 = st.columns(4)
+k1, k2, k3, k4 = st.columns(3)
 
 k1.metric("✈️ Avg Flights / Hour", avg_flights_per_hour)
 k2.metric("🌍 Domestic Flights", f"{domestic_pct:.2f}%")
-k3.metric("⏱ On-Time Flights", f"{on_time_pct:.2f}%")
-k4.metric("⏱ Delayed flights", f"{delayed_pct:.2f}%")
+k3.metric("⏱ Delayed flights", f"{delayed_pct:.2f}%")
 
 st.caption(
     "Delay computed using arrival delay for inbound flights "
-    "and departure delay for outbound flights (NULL treated as 0)."
+    "and departure delay for outbound flights."
 )
 
 
