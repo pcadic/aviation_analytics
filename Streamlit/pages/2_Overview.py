@@ -9,7 +9,13 @@ st.set_page_config(layout="wide")
 # =========================
 @st.cache_data
 def load_data():
-    return pd.read_parquet("data/clean_flights.parquet")
+    response = (
+        supabase
+        .table("v_flights_enriched")
+        .select("*")
+        .execute()
+    )
+    return response.data
 
 df = load_data()
 
@@ -117,7 +123,7 @@ fig_orig.update_layout(
     showlegend=False
 )
 
-st.plotly_chart(fig_orig, use_container_width=True)
+st.plotly_chart(fig, width="stretch")
 
 # =========================
 # DESTINATIONS FROM CYVR
@@ -149,7 +155,7 @@ fig_dest.update_layout(
     showlegend=False
 )
 
-st.plotly_chart(fig_dest, use_container_width=True)
+st.plotly_chart(fig, width="stretch")
 
 # =========================
 # AIRCRAFT TYPES
@@ -181,7 +187,7 @@ fig_aircraft.update_layout(
     showlegend=False
 )
 
-st.plotly_chart(fig_aircraft, use_container_width=True)
+st.plotly_chart(fig, width="stretch")
 
 # =========================
 # AIRLINES
@@ -213,4 +219,4 @@ fig_airlines.update_layout(
     showlegend=False
 )
 
-st.plotly_chart(fig_airlines, use_container_width=True)
+st.plotly_chart(fig, width="stretch")
