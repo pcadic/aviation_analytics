@@ -7,144 +7,156 @@ import os
 # ============================
 # CONFIG
 # ============================
-st.set_page_config(page_title="Operational Insights", layout="wide")
+st.set_page_config(
+    page_title="Operational Insights",
+    page_icon="🛫",
+    layout="wide"
+)
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+SUPABASE_URL = os.environ["SUPABASE_URL"]
+SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ============================
-# LOAD DATA
+# LOAD DATA (FROM VIEW)
 # ============================
 @st.cache_data
 def load_data():
-    response = (
-        supabase
-        .table("v_flights_enriched")
-        .select("*")
-        .execute()
-    )
-    return response.data
+    query = """
+    SELECT
+        flight_icao,
+        dep_icao,
+        arr_icao,
+        dep_country_ref,
+        arr_country_ref,
+        dep_time_utc,
+        arr_time_utc,
+        dep_delayed,
+        arr_delayed,
+        airline_name
+    FROM v_flights_enriched
+    """
+    return supabase.rpc("run_sql", {"query": query}).execute().data
+
 
 df = pd.DataFrame(load_data())
 
 # ============================
 # CLEANING
 # ============================
-df["dep_delayed"] = df["dep_delayed"].fillna(0)
-df["arr_delayed"] = df["arr_delayed"].fillna(0)
+df["dep_time_utc"] = pd.to_datetime(df["dep_time_utc"])
+df["arr_time_utc"] = pd.to_datetime(df["arr_time_utc"])
 
-df["hour_dep"] = pd.to_datetime(df["scheduled_departure"], errors="coerce").dt.hour
-df["hour_arr"] = pd.to_datetime(df["scheduled_arrival"], errors="coerce").dt.hour
+df["dep_delay"] = df["dep_delayed"].fillna(0)
+df["arr_delay"] = df["arr_delayed"].fillna(0)
 
+# Determine if arrival or departure at CYVR
 df["is_departure"] = df["dep_icao"] == "CYVR"
 df["is_arrival"] = df["arr_icao"] == "CYVR"
+
+# Unified delay metric
+df["delay"] = df.apply(
+    lambda r: r["dep_delay"] if r["is_departure"] else r["arr_delay"],
+    axis=1
+)
 
 # ============================
 # PAGE TITLE
 # ============================
-st.title("✈️ Operational Insights – Vancouver International Airport")
-st.markdown("Operational performance analysis based on real flight activity data.")
+st.title("✈️ Operational Insights")
+st.caption("Operational performance analysis based on real flight data")
 
 # ============================
-# SECTION 1 — TRAFFIC
+# KPI SECTION
 # ============================
-st.subheader("🕒 Traffic Load")
+col1, col2, col3 = st.columns(3)
 
-traffic_hourly = (
-    pd.concat([
-        df[df["is_departure"]]["hour_dep"],
-        df[df["is_arrival"]]["hour_arr"]
-    ])
-    .value_counts()
-    .sort_index()
+avg_delay = round(df["delay"].mean(), 1)
+on_time_pct = round((df["delay"] <= 15).mean() * 100, 1)
+flights_per_hour = round(
+    len(df) / df["dep_time_utc"].dt.date.nunique() / 24, 2
 )
 
-fig_traffic = px.bar(
-    traffic_hourly,
-    labels={"value": "Average Flights", "index": "Hour of Day"},
-    title="Average Number of Flights per Hour"
-)
-
-st.plotly_chart(fig_traffic, use_container_width=True)
+col1.metric("Average Delay", f"{avg_delay} min")
+col2.metric("On-Time Flights", f"{on_time_pct} %")
+col3.metric("Avg Flights / Hour", flights_per_hour)
 
 # ============================
-# SECTION 2 — ON-TIME PERFORMANCE
+# DELAY BY AIRLINE
 # ============================
-st.subheader("⏱ On-Time Performance")
+st.subheader("Average Delay by Airline")
 
-df["effective_delay"] = df.apply(
-    lambda x: x["arr_delayed"] if x["is_arrival"] else x["dep_delayed"],
-    axis=1
-)
-
-on_time_pct = round((df["effective_delay"] <= 15).mean() * 100, 2)
-avg_delay = round(df["effective_delay"].mean(), 2)
-
-col1, col2 = st.columns(2)
-col1.metric("On-Time Flights (%)", f"{on_time_pct}%")
-col2.metric("Average Delay (min)", avg_delay)
-
-# ============================
-# SECTION 3 — AIRLINE PERFORMANCE
-# ============================
-st.subheader("✈️ Airline Performance")
-
-airline_perf = (
-    df[df["airline_name"].notna()]
-    .groupby("airline_name")["effective_delay"]
-    .agg(
-        avg_delay="mean",
-        on_time_rate=lambda x: (x <= 15).mean() * 100
-    )
-    .sort_values("on_time_rate", ascending=False)
-    .head(10)
+airline_delay = (
+    df.dropna(subset=["airline_name"])
+      .groupby("airline_name")["delay"]
+      .mean()
+      .sort_values(ascending=False)
+      .head(10)
 )
 
 fig_airline = px.bar(
-    airline_perf.sort_values("on_time_rate"),
-    x="on_time_rate",
-    y=airline_perf.sort_values("on_time_rate").index,
+    airline_delay.sort_values(),
     orientation="h",
-    title="Top Airlines by On-Time Performance",
-    labels={"x": "On-Time Rate (%)", "y": ""}
+    title="Average Delay per Airline (min)",
 )
 
-fig_airline.update_layout(showlegend=False)
+fig_airline.update_layout(
+    xaxis_title="Delay (minutes)",
+    yaxis_title="",
+    showlegend=False
+)
+
 st.plotly_chart(fig_airline, use_container_width=True)
 
 # ============================
-# SECTION 4 — AIRCRAFT TYPES
+# HOURLY TRAFFIC
 # ============================
-st.subheader("🛩 Aircraft Types")
+st.subheader("Hourly Traffic Load")
 
-aircrafts = (
-    df["aircraft_icao"]
-    .dropna()
-    .value_counts(normalize=True)
-    .mul(100)
-    .head(10)
+df["hour"] = df["dep_time_utc"].dt.hour
+
+hourly = (
+    df.groupby("hour")
+      .size()
+      .reset_index(name="flights")
 )
 
-fig_aircraft = px.bar(
-    aircrafts.sort_values(),
-    orientation="h",
-    labels={"value": "Percentage (%)", "index": "Aircraft Type"},
-    title="Most Common Aircraft Types"
+fig_hour = px.line(
+    hourly,
+    x="hour",
+    y="flights",
+    markers=True,
+    title="Flights per Hour (Arrivals + Departures)"
 )
 
-fig_aircraft.update_layout(showlegend=False)
-st.plotly_chart(fig_aircraft, use_container_width=True)
+fig_hour.update_layout(
+    xaxis_title="Hour of Day",
+    yaxis_title="Number of Flights"
+)
+
+st.plotly_chart(fig_hour, use_container_width=True)
 
 # ============================
-# SECTION 5 — INSIGHTS
+# DELAY DISTRIBUTION
 # ============================
-st.subheader("📌 Operational Insights")
+st.subheader("Delay Distribution")
 
-st.markdown("""
-- Traffic peaks occur during morning and late afternoon hours, indicating commuter and long-haul waves.
-- On-time performance remains generally high, with delays concentrated during peak periods.
-- A small number of airlines represent the majority of flights.
-- Aircraft usage is dominated by short and medium-haul models, consistent with regional and North American traffic.
-- These indicators suggest optimization opportunities in ground operations during peak hours.
-""")
+fig_dist = px.histogram(
+    df,
+    x="delay",
+    nbins=40,
+    title="Distribution of Flight Delays (minutes)"
+)
+
+fig_dist.update_layout(
+    xaxis_title="Delay (minutes)",
+    yaxis_title="Number of Flights"
+)
+
+st.plotly_chart(fig_dist, use_container_width=True)
+
+# ============================
+# FOOTER
+# ============================
+st.caption("Data source: AirLabs + Open-Meteo | Processed via Supabase")
