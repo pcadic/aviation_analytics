@@ -80,7 +80,7 @@ col3.metric("Avg Flights / Hour", flights_per_hour)
 st.subheader("Average Delay by Airline")
 
 airline_delay = (
-    df.dropna(subset=["airline_name"])
+    df.dropna(subset=["airline_name", "delay"])
       .groupby("airline_name")["delay"]
       .mean()
       .sort_values(ascending=False)
@@ -90,12 +90,12 @@ airline_delay = (
 fig_airline = px.bar(
     airline_delay.sort_values(),
     orientation="h",
-    title="Average Delay per Airline (min)",
+    title="Average Delay per Airline (minutes)"
 )
 
 fig_airline.update_traces(
-    text=airline_delay.round(2),
-   #texttemplate="%{text} %",
+    texttemplate="%{x:.0f} min",   # ← affichage en minutes
+    textposition="outside",        # ← horizontal, lisible
     hoverinfo="skip",
     hovertemplate=None
 )
@@ -103,10 +103,21 @@ fig_airline.update_traces(
 fig_airline.update_layout(
     xaxis_title="Delay (minutes)",
     yaxis_title="",
-    showlegend=False
+    showlegend=False,
+    uniformtext_minsize=10,
+    uniformtext_mode="hide"
+)
+
+fig_airline.add_vline(
+    x=15,
+    line_dash="dot",
+    line_color="red",
+    annotation_text="15 min threshold",
+    annotation_position="top right"
 )
 
 st.plotly_chart(fig_airline, width="stretch")
+
 
 # ============================
 # HOURLY TRAFFIC
