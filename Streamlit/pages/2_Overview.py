@@ -2,6 +2,16 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
+import os
+from supabase import create_client
+import streamlit as st
+
+
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_ANON_KEY"]
+
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
 st.set_page_config(layout="wide")
 
 # =========================
@@ -15,7 +25,7 @@ def load_data():
         .select("*")
         .execute()
     )
-    return response.data
+    return pd.DataFrame(response.data)
 
 df = load_data()
 
