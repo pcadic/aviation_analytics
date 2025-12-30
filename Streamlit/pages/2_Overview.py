@@ -165,7 +165,7 @@ fig_dest.update_layout(
     showlegend=False
 )
 
-st.plotly_chart(fig_destig, width="stretch")
+st.plotly_chart(fig_dest, width="stretch")
 
 # =========================
 # AIRCRAFT TYPES
