@@ -18,24 +18,13 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ============================
 @st.cache_data
 def load_data():
-    query = """
-        SELECT
-            f.flight_date,
-            f.dep_icao,
-            f.arr_icao,
-            f.dep_delayed,
-            f.arr_delayed,
-            f.aircraft_icao,
-            f.airline_name,
-            a_dep.country AS dep_country,
-            a_arr.country AS arr_country,
-            f.scheduled_departure,
-            f.scheduled_arrival
-        FROM flight_airlabs f
-        LEFT JOIN airports_reference a_dep ON f.dep_icao = a_dep.icao
-        LEFT JOIN airports_reference a_arr ON f.arr_icao = a_arr.icao
-    """
-    return supabase.rpc("run_sql", {"query": query}).execute().data
+    response = (
+        supabase
+        .table("v_flights_enriched")
+        .select("*")
+        .execute()
+    )
+    return response.data
 
 df = pd.DataFrame(load_data())
 
