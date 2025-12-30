@@ -133,7 +133,7 @@ fig_orig.update_layout(
     showlegend=False
 )
 
-st.plotly_chart(fig, width="stretch")
+st.plotly_chart(fig_orig, width="stretch")
 
 # =========================
 # DESTINATIONS FROM CYVR
@@ -165,7 +165,7 @@ fig_dest.update_layout(
     showlegend=False
 )
 
-st.plotly_chart(fig, width="stretch")
+st.plotly_chart(fig_destig, width="stretch")
 
 # =========================
 # AIRCRAFT TYPES
@@ -197,7 +197,7 @@ fig_aircraft.update_layout(
     showlegend=False
 )
 
-st.plotly_chart(fig, width="stretch")
+st.plotly_chart(fig_aircraft, width="stretch")
 
 # =========================
 # AIRLINES
@@ -229,4 +229,4 @@ fig_airlines.update_layout(
     showlegend=False
 )
 
-st.plotly_chart(fig, width="stretch")
+st.plotly_chart(fig_airlines, width="stretch")
