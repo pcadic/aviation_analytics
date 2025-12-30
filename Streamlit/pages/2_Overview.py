@@ -125,6 +125,7 @@ fig_orig.update_traces(
     texttemplate="%{text} %",
     hoverinfo="skip",
     hovertemplate=None
+)
 
 
 fig_orig.update_layout(
