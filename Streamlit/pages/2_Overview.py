@@ -123,8 +123,9 @@ fig_orig = px.bar(
 fig_orig.update_traces(
     text=origins.round(2),
     texttemplate="%{text} %",
-    hoverinfo="skip"
-)
+    hoverinfo="skip",
+    hovertemplate=None
+
 
 fig_orig.update_layout(
     title="Top Origin Countries (Arrivals to CYVR)",
@@ -155,7 +156,8 @@ fig_dest = px.bar(
 fig_dest.update_traces(
     text=destinations.round(2),
     texttemplate="%{text} %",
-    hoverinfo="skip"
+    hoverinfo="skip",
+    hovertemplate=None
 )
 
 fig_dest.update_layout(
@@ -187,7 +189,8 @@ fig_aircraft = px.bar(
 fig_aircraft.update_traces(
     text=aircrafts.round(2),
     texttemplate="%{text} %",
-    hoverinfo="skip"
+    hoverinfo="skip",
+    hovertemplate=None
 )
 
 fig_aircraft.update_layout(
@@ -219,7 +222,8 @@ fig_airlines = px.bar(
 fig_airlines.update_traces(
     text=airlines.round(2),
     texttemplate="%{text} %",
-    hoverinfo="skip"
+    hoverinfo="skip",
+    hovertemplate=None
 )
 
 fig_airlines.update_layout(
