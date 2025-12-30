@@ -99,7 +99,7 @@ fig_airline.update_layout(
     showlegend=False
 )
 
-st.plotly_chart(fig_airline, use_container_width=True)
+st.plotly_chart(fig_airline, width="stretch")
 
 # ============================
 # HOURLY TRAFFIC
@@ -127,7 +127,7 @@ fig_hour.update_layout(
     yaxis_title="Number of Flights"
 )
 
-st.plotly_chart(fig_hour, use_container_width=True)
+st.plotly_chart(fig_hour, width="stretch")
 
 # ============================
 # DELAY DISTRIBUTION
@@ -146,7 +146,7 @@ fig_dist.update_layout(
     yaxis_title="Number of Flights"
 )
 
-st.plotly_chart(fig_dist, use_container_width=True)
+st.plotly_chart(fig_dist, width="stretch")
 
 # ============================
 # FOOTER
