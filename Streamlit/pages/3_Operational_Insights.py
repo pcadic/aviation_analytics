@@ -94,7 +94,7 @@ fig_airline = px.bar(
 )
 
 fig_airline.update_traces(
-    #text=airline_delay.round(2),
+    text=airline_delay.round(2),
    #texttemplate="%{text} %",
     hoverinfo="skip",
     hovertemplate=None
