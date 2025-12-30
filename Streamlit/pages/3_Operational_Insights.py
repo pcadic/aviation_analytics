@@ -93,6 +93,13 @@ fig_airline = px.bar(
     title="Average Delay per Airline (min)",
 )
 
+fig_airline.update_traces(
+    text=airline_delay.round(2),
+    texttemplate="%{text} %",
+    hoverinfo="skip",
+    hovertemplate=None
+)
+
 fig_airline.update_layout(
     xaxis_title="Delay (minutes)",
     yaxis_title="",
