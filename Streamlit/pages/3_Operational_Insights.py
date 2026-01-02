@@ -62,12 +62,12 @@ avg_flights_per_hour = round(traffic.groupby("hour").size().mean(), 2)
 avg_pax = int(df["avg_pax"].mean())
 total_pax = int(df["avg_pax"].sum())
 
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4 = st.columns(4)
 c1.metric("Avg Delay", f"{avg_delay} min")
 c2.metric("On-time Flights", f"{on_time_pct}%")
 c3.metric("Flights / Hour", avg_flights_per_hour)
 c4.metric("Avg Pax / Flight", avg_pax)
-c5.metric("Total Estimated Pax", f"{total_pax:,}")
+#c5.metric("Total Estimated Pax", f"{total_pax:,}")
 
 st.divider()
 
