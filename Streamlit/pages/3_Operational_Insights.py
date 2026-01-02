@@ -2,37 +2,26 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from supabase import create_client
-import os
 
 # ============================
 # CONFIG
 # ============================
-st.set_page_config(
-    page_title="Operational Insights",
-    page_icon="🛫",
-    layout="wide"
+st.set_page_config(page_title="Operational Insights", layout="wide")
+
+supabase = create_client(
+    st.secrets["SUPABASE_URL"],
+    st.secrets["SUPABASE_ANON_KEY"]
 )
 
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_ANON_KEY"]
-
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
 # ============================
-# LOAD DATA (FROM VIEW)
+# LOAD DATA
 # ============================
 @st.cache_data
 def load_data():
-    response = (
-        supabase
-        .table("v_flights_enriched")
-        .select("*")
-        .execute()
-    )
-    return response.data
+    res = supabase.table("v_flights_enriched").select("*").execute()
+    return pd.DataFrame(res.data)
 
-
-df = pd.DataFrame(load_data())
+df = load_data()
 
 # ============================
 # CLEANING
@@ -43,36 +32,44 @@ df["arr_time_utc"] = pd.to_datetime(df["arr_time_utc"])
 df["dep_delay"] = df["dep_delayed"].fillna(0)
 df["arr_delay"] = df["arr_delayed"].fillna(0)
 
-# Determine if arrival or departure at CYVR
 df["is_departure"] = df["dep_icao"] == "CYVR"
 df["is_arrival"] = df["arr_icao"] == "CYVR"
 
-# Unified delay metric
 df["delay"] = df.apply(
     lambda r: r["dep_delay"] if r["is_departure"] else r["arr_delay"],
     axis=1
 )
 
-# ============================
-# PAGE TITLE
-# ============================
-st.title("✈️ Operational Insights")
-st.caption("Operational performance analysis based on real flight data")
+# Passenger estimate
+df["avg_pax"] = (df["ac_min_pax"] + df["ac_max_pax"]) / 2
 
 # ============================
 # KPI SECTION
 # ============================
-col1, col2, col3 = st.columns(3)
+st.title("✈️ Operational Insights")
 
 avg_delay = round(df["delay"].mean(), 1)
 on_time_pct = round((df["delay"] <= 15).mean() * 100, 1)
-flights_per_hour = round(
-    len(df) / df["dep_time_utc"].dt.date.nunique() / 24, 2
-)
 
-col1.metric("Average Delay", f"{avg_delay} min")
-col2.metric("On-Time Flights", f"{on_time_pct} %")
-col3.metric("Avg Flights / Hour", flights_per_hour)
+traffic = pd.concat([
+    df[df["is_departure"]][["dep_time_utc"]].rename(columns={"dep_time_utc": "time"}),
+    df[df["is_arrival"]][["arr_time_utc"]].rename(columns={"arr_time_utc": "time"})
+])
+
+traffic["hour"] = traffic["time"].dt.hour
+avg_flights_per_hour = round(traffic.groupby("hour").size().mean(), 2)
+
+avg_pax = int(df["avg_pax"].mean())
+total_pax = int(df["avg_pax"].sum())
+
+c1, c2, c3, c4, c5 = st.columns(5)
+c1.metric("Avg Delay", f"{avg_delay} min")
+c2.metric("On-time Flights", f"{on_time_pct}%")
+c3.metric("Flights / Hour", avg_flights_per_hour)
+c4.metric("Avg Pax / Flight", avg_pax)
+c5.metric("Total Estimated Pax", f"{total_pax:,}")
+
+st.divider()
 
 # ============================
 # DELAY BY AIRLINE
@@ -80,57 +77,46 @@ col3.metric("Avg Flights / Hour", flights_per_hour)
 st.subheader("Average Delay by Airline")
 
 airline_delay = (
-    df.dropna(subset=["airline_name", "delay"])
+    df.dropna(subset=["airline_name"])
       .groupby("airline_name")["delay"]
       .mean()
-      .sort_values(ascending=False)
-      .head(10)
+      .sort_values()
+      .tail(10)
 )
 
 fig_airline = px.bar(
-    airline_delay.sort_values(),
+    airline_delay,
     orientation="h",
     title="Average Delay per Airline (minutes)"
 )
 
 fig_airline.update_traces(
-    texttemplate="%{x:.0f} min",   # ← affichage en minutes
-    textposition="outside",        # ← horizontal, lisible
-    hoverinfo="skip",
-    hovertemplate=None
+    text=airline_delay.round(1),
+    texttemplate="%{text} min",
+    hoverinfo="skip"
 )
 
 fig_airline.update_layout(
     xaxis_title="Delay (minutes)",
     yaxis_title="",
-    showlegend=False,
-    uniformtext_minsize=10,
-    uniformtext_mode="hide"
+    showlegend=False
 )
 
 fig_airline.add_vline(
     x=15,
     line_dash="dot",
     line_color="red",
-    annotation_text="15 min threshold",
-    annotation_position="top right"
+    annotation_text="15 min threshold"
 )
 
 st.plotly_chart(fig_airline, width="stretch")
-
 
 # ============================
 # HOURLY TRAFFIC
 # ============================
 st.subheader("Hourly Traffic Load")
 
-df["hour"] = df["dep_time_utc"].dt.hour
-
-hourly = (
-    df.groupby("hour")
-      .size()
-      .reset_index(name="flights")
-)
+hourly = traffic.groupby("hour").size().reset_index(name="flights")
 
 fig_hour = px.line(
     hourly,
@@ -156,15 +142,41 @@ fig_dist = px.histogram(
     df,
     x="delay",
     nbins=40,
-    title="Distribution of Flight Delays (minutes)"
+    title="Distribution of Flight Delays"
 )
 
 fig_dist.update_layout(
     xaxis_title="Delay (minutes)",
-    yaxis_title="Number of Flights"
+    yaxis_title="Flights"
 )
 
 st.plotly_chart(fig_dist, width="stretch")
+
+# ============================
+# PASSENGER LOAD BY HOUR
+# ============================
+st.subheader("Estimated Passenger Load per Hour")
+
+pax_hour = (
+    df.assign(hour=df["dep_time_utc"].dt.hour)
+      .groupby("hour")["avg_pax"]
+      .sum()
+      .reset_index()
+)
+
+fig_pax = px.bar(
+    pax_hour,
+    x="hour",
+    y="avg_pax",
+    title="Estimated Passenger Volume per Hour"
+)
+
+fig_pax.update_layout(
+    xaxis_title="Hour",
+    yaxis_title="Estimated Passengers"
+)
+
+st.plotly_chart(fig_pax, width="stretch")
 
 # ============================
 # FOOTER
