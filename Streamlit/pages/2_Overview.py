@@ -1,114 +1,91 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-
-import os
 from supabase import create_client
-import streamlit as st
 
+# =========================
+# CONFIG
+# =========================
+st.set_page_config(layout="wide")
 
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_ANON_KEY"]
-
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-st.set_page_config(layout="wide")
 
 # =========================
 # LOAD DATA
 # =========================
 @st.cache_data
 def load_data():
-    response = (
-        supabase
-        .table("v_flights_enriched")
-        .select("*")
-        .execute()
-    )
-    return pd.DataFrame(response.data)
+    res = supabase.table("v_flights_enriched").select("*").execute()
+    return pd.DataFrame(res.data)
 
 df = load_data()
 
 # =========================
 # BASIC CLEANING
 # =========================
-df = df.copy()
+df = df.dropna(subset=["dep_icao", "arr_icao", "dep_country_ref", "arr_country_ref"])
 
-# Drop rows without airport references
-df = df.dropna(subset=[
-    "dep_icao",
-    "arr_icao",
-    "dep_country_ref",
-    "arr_country_ref"
-])
+# Estimated passengers
+df["avg_pax"] = (df["ac_min_pax"] + df["ac_max_pax"]) / 2
 
 # =========================
-# KPI — DOMESTIC vs INTERNATIONAL
+# KPI — DOMESTIC VS INTL
 # =========================
 df["is_domestic"] = (
     (df["dep_country_ref"] == "Canada") &
     (df["arr_country_ref"] == "Canada")
 )
 
-domestic_pct = round(df["is_domestic"].mean() * 100, 2)
-international_pct = round(100 - domestic_pct, 2)
+domestic_pct = round(df["is_domestic"].mean() * 100, 1)
+international_pct = round(100 - domestic_pct, 1)
 
 # =========================
-# KPI — AVERAGE TRAFFIC PER HOUR
+# KPI — TRAFFIC PER HOUR
 # =========================
+traffic = pd.concat([
+    df[df["arr_icao"] == "CYVR"][["arr_time_utc"]].rename(columns={"arr_time_utc": "time"}),
+    df[df["dep_icao"] == "CYVR"][["dep_time_utc"]].rename(columns={"dep_time_utc": "time"})
+])
 
-# Arrivals
-arrivals = df[df["arr_icao"] == "CYVR"][["arr_time_utc"]].rename(
-    columns={"arr_time_utc": "time"}
-)
-
-# Departures
-departures = df[df["dep_icao"] == "CYVR"][["dep_time_utc"]].rename(
-    columns={"dep_time_utc": "time"}
-)
-
-traffic = pd.concat([arrivals, departures])
 traffic["hour"] = pd.to_datetime(traffic["time"]).dt.hour
-
-avg_flights_per_hour = round(
-    traffic["hour"].value_counts().mean(),
-    2
-)
+avg_flights_per_hour = round(traffic.groupby("hour").size().mean(), 2)
 
 # =========================
-# KPI — ON TIME FLIGHTS
+# KPI — ON TIME
 # =========================
-
 df["effective_delay"] = df.apply(
     lambda r: r["arr_delayed"] if r["arr_icao"] == "CYVR" else r["dep_delayed"],
     axis=1
-)
+).fillna(0)
 
-df["effective_delay"] = df["effective_delay"].fillna(0)
+on_time_pct = round((df["effective_delay"] <= 15).mean() * 100, 1)
 
-on_time_pct = round(
-    (df["effective_delay"] <= 15).mean() * 100,
-    2
-)
+# =========================
+# KPI — PASSENGERS
+# =========================
+avg_pax_per_flight = round(df["avg_pax"].mean(), 0)
+total_estimated_pax = int(df["avg_pax"].sum())
 
 # =========================
 # KPI DISPLAY
 # =========================
+c1, c2, c3, c4, c5 = st.columns(5)
 
-col1, col2, col3 = st.columns(3)
-
-col1.metric("Avg aircraft movements / hour", avg_flights_per_hour)
-col2.metric("Domestic flights (%)", f"{domestic_pct}%")
-col3.metric("On-time flights (%)", f"{on_time_pct}%")
+c1.metric("Avg flights / hour", avg_flights_per_hour)
+c2.metric("Domestic flights", f"{domestic_pct}%")
+c3.metric("On-time flights", f"{on_time_pct}%")
+c4.metric("Avg pax / flight", int(avg_pax_per_flight))
+c5.metric("Total estimated pax", f"{total_estimated_pax:,}")
 
 st.divider()
 
 # =========================
-# ORIGINS → CYVR
+# ORIGINS
 # =========================
 origins = (
     df[df["arr_icao"] == "CYVR"]["dep_country_ref"]
-    .dropna()
     .value_counts(normalize=True)
     .mul(100)
     .sort_values()
@@ -118,18 +95,16 @@ origins = (
 fig_orig = px.bar(
     origins,
     orientation="h",
+    title="Top Origin Countries (Arrivals)",
 )
 
 fig_orig.update_traces(
     text=origins.round(2),
     texttemplate="%{text} %",
-    hoverinfo="skip",
-    hovertemplate=None
+    hoverinfo="skip"
 )
 
-
 fig_orig.update_layout(
-    title="Top Origin Countries (Arrivals to CYVR)",
     xaxis_title="Percentage (%)",
     yaxis_title="",
     showlegend=False
@@ -138,11 +113,10 @@ fig_orig.update_layout(
 st.plotly_chart(fig_orig, width="stretch")
 
 # =========================
-# DESTINATIONS FROM CYVR
+# DESTINATIONS
 # =========================
 destinations = (
     df[df["dep_icao"] == "CYVR"]["arr_country_ref"]
-    .dropna()
     .value_counts(normalize=True)
     .mul(100)
     .sort_values()
@@ -152,17 +126,16 @@ destinations = (
 fig_dest = px.bar(
     destinations,
     orientation="h",
+    title="Top Destination Countries (Departures)",
 )
 
 fig_dest.update_traces(
     text=destinations.round(2),
     texttemplate="%{text} %",
-    hoverinfo="skip",
-    hovertemplate=None
+    hoverinfo="skip"
 )
 
 fig_dest.update_layout(
-    title="Top Destination Countries (Departures from CYVR)",
     xaxis_title="Percentage (%)",
     yaxis_title="",
     showlegend=False
@@ -184,18 +157,17 @@ aircrafts = (
 
 fig_aircraft = px.bar(
     aircrafts,
-    orientation="h"
+    orientation="h",
+    title="Most Common Aircraft Types"
 )
 
 fig_aircraft.update_traces(
     text=aircrafts.round(2),
     texttemplate="%{text} %",
-    hoverinfo="skip",
-    hovertemplate=None
+    hoverinfo="skip"
 )
 
 fig_aircraft.update_layout(
-    title="Most Common Aircraft Types",
     xaxis_title="Percentage (%)",
     yaxis_title="",
     showlegend=False
@@ -217,18 +189,17 @@ airlines = (
 
 fig_airlines = px.bar(
     airlines,
-    orientation="h"
+    orientation="h",
+    title="Top Airlines"
 )
 
 fig_airlines.update_traces(
     text=airlines.round(2),
     texttemplate="%{text} %",
-    hoverinfo="skip",
-    hovertemplate=None
+    hoverinfo="skip"
 )
 
 fig_airlines.update_layout(
-    title="Top Airlines",
     xaxis_title="Percentage (%)",
     yaxis_title="",
     showlegend=False
