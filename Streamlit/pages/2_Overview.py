@@ -91,7 +91,7 @@ duration_pct = (
 # =========================
 # KPI DISPLAY
 # =========================
-c1, c2, c3 = st.columns(6)
+c1, c2, c3, c4, c5, c6 = st.columns(6)
 
 c1.metric("Avg flights / hour", avg_flights_per_hour)
 c2.metric("Domestic flights", f"{domestic_pct}%")
