@@ -49,7 +49,7 @@ df["avg_pax"] = (df["ac_min_pax"] + df["ac_max_pax"]) / 2
 st.title("✈️ Operational Insights")
 
 avg_delay = round(df["delay"].mean(), 1)
-on_time_pct = round((df["delay"] <= 15).mean() * 100, 1)
+#on_time_pct = round((df["delay"] <= 15).mean() * 100, 1)
 
 traffic = pd.concat([
     df[df["is_departure"]][["dep_time_utc"]].rename(columns={"dep_time_utc": "time"}),
@@ -60,14 +60,43 @@ traffic["hour"] = traffic["time"].dt.hour
 avg_flights_per_hour = round(traffic.groupby("hour").size().mean(), 2)
 
 avg_pax = int(df["avg_pax"].mean())
-total_pax = int(df["avg_pax"].sum())
+#total_pax = int(df["avg_pax"].sum())
 
-c1, c2, c3, c4 = st.columns(4)
+# ============================
+# WEATHER IMPACT KPI
+# ============================
+
+weather_df = df.copy()
+
+weather_df["is_rain"] = (
+    weather_df["dep_is_rain"].fillna(False) |
+    weather_df["arr_is_rain"].fillna(False)
+)
+
+weather_df["is_strong_wind"] = (
+    weather_df["dep_is_strong_wind"].fillna(False) |
+    weather_df["arr_is_strong_wind"].fillna(False)
+)
+
+weather_df["is_severe_weather"] = (
+    weather_df["dep_weather_severity"].fillna(0) >= 2 |
+    weather_df["arr_weather_severity"].fillna(0) >= 2
+)
+
+rain_pct = round(weather_df["is_rain"].mean() * 100, 1)
+wind_pct = round(weather_df["is_strong_wind"].mean() * 100, 1)
+severe_pct = round(weather_df["is_severe_weather"].mean() * 100, 1)
+
+
+c1, c2, c3, c4, c5, c6 = st.columns(6)
 c1.metric("Avg Delay", f"{avg_delay} min")
-c2.metric("On-time Flights", f"{on_time_pct}%")
-c3.metric("Flights / Hour", avg_flights_per_hour)
-c4.metric("Avg Pax / Flight", avg_pax)
+#c2.metric("On-time Flights", f"{on_time_pct}%")
+c2.metric("Flights / Hour", avg_flights_per_hour)
+c3.metric("Avg Pax / Flight", avg_pax)
 #c5.metric("Total Estimated Pax", f"{total_pax:,}")
+4.metric("Flights affected by rain", f"{rain_pct} %")
+c5.metric("Flights affected by strong wind", f"{wind_pct} %")
+c6.metric("Flights with severe weather", f"{severe_pct} %")
 
 st.divider()
 
