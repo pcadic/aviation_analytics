@@ -208,6 +208,43 @@ fig_pax.update_layout(
 st.plotly_chart(fig_pax, width="stretch")
 
 # ============================
+# AVERAGE DELAY BY AIRCRAFT TYPE
+# ============================
+st.subheader("Average Delay by Aircraft Type")
+
+aircraft_delay = (
+    df.dropna(subset=["aircraft_icao", "delay"])
+      .groupby("aircraft_icao")["delay"]
+      .mean()
+      .sort_values(ascending=False)
+      .head(10)
+)
+
+fig_aircraft = px.bar(
+    aircraft_delay.sort_values(),
+    orientation="h",
+    title="Average Delay per Aircraft Type (minutes)"
+)
+
+fig_aircraft.update_traces(
+    texttemplate="%{x:.0f} min",
+    textposition="outside",
+    hoverinfo="skip",
+    hovertemplate=None
+)
+
+fig_aircraft.update_layout(
+    xaxis_title="Delay (minutes)",
+    yaxis_title="",
+    showlegend=False,
+    uniformtext_minsize=10,
+    uniformtext_mode="hide"
+)
+
+st.plotly_chart(fig_aircraft, width="stretch")
+
+
+# ============================
 # FOOTER
 # ============================
 st.caption("Data source: AirLabs + Open-Meteo | Processed via Supabase")
