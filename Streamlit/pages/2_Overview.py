@@ -69,13 +69,36 @@ avg_pax_per_flight = round(df["avg_pax"].mean(), 0)
 #total_estimated_pax = int(df["avg_pax"].sum())
 
 # =========================
+# FLIGHT DURATION BUCKETS
+# =========================
+
+df_duration = df.dropna(subset=["duration"]).copy()
+
+df_duration["flight_type"] = pd.cut(
+    df_duration["duration"],
+    bins=[0, 120, 300, 10_000],
+    labels=["Short-haul (<2h)", "Medium-haul (2–5h)", "Long-haul (>5h)"]
+)
+
+duration_pct = (
+    df_duration["flight_type"]
+    .value_counts(normalize=True)
+    .mul(100)
+    .round(1)
+)
+
+
+# =========================
 # KPI DISPLAY
 # =========================
-c1, c2, c3 = st.columns(3)
+c1, c2, c3 = st.columns(6)
 
 c1.metric("Avg flights / hour", avg_flights_per_hour)
 c2.metric("Domestic flights", f"{domestic_pct}%")
 c3.metric("On-time flights", f"{on_time_pct}%")
+c4.metric("Short-haul flights", f"{duration_pct.get('Short-haul (<2h)', 0)} %")
+c5.metric("Medium-haul flights", f"{duration_pct.get('Medium-haul (2–5h)', 0)} %")
+c6.metric("Long-haul flights", f"{duration_pct.get('Long-haul (>5h)', 0)} %")
 #idée KPI : nombre d'ailines différentes, nombres de destinations differentes
 #c4.metric("Avg pax / flight", int(avg_pax_per_flight))
 #c5.metric("Total estimated pax", f"{total_estimated_pax:,}")
