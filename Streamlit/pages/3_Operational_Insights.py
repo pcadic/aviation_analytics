@@ -79,9 +79,10 @@ weather_df["is_strong_wind"] = (
 )
 
 weather_df["is_severe_weather"] = (
-    weather_df["dep_weather_severity"].fillna(0) >= 2 |
-    weather_df["arr_weather_severity"].fillna(0) >= 2
+    (weather_df["dep_weather_severity"].fillna(0) >= 2) |
+    (weather_df["arr_weather_severity"].fillna(0) >= 2)
 )
+
 
 rain_pct = round(weather_df["is_rain"].mean() * 100, 1)
 wind_pct = round(weather_df["is_strong_wind"].mean() * 100, 1)
