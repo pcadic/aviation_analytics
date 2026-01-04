@@ -94,7 +94,7 @@ c1.metric("Avg Delay", f"{avg_delay} min")
 c2.metric("Flights / Hour", avg_flights_per_hour)
 c3.metric("Avg Pax / Flight", avg_pax)
 #c5.metric("Total Estimated Pax", f"{total_pax:,}")
-4.metric("Flights affected by rain", f"{rain_pct} %")
+c4.metric("Flights affected by rain", f"{rain_pct} %")
 c5.metric("Flights affected by strong wind", f"{wind_pct} %")
 c6.metric("Flights with severe weather", f"{severe_pct} %")
 
