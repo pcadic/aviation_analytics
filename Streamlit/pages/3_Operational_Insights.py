@@ -104,7 +104,7 @@ st.divider()
 # ============================
 # DELAY BY AIRLINE
 # ============================
-st.subheader("Average Delay by Airline")
+#st.subheader("Average Delay by Airline")
 
 airline_delay = (
     df.dropna(subset=["airline_name"])
@@ -144,7 +144,7 @@ st.plotly_chart(fig_airline, width="stretch")
 # ============================
 # HOURLY TRAFFIC
 # ============================
-st.subheader("Hourly Traffic Load")
+#st.subheader("Hourly Traffic Load")
 
 hourly = traffic.groupby("hour").size().reset_index(name="flights")
 
@@ -166,7 +166,7 @@ st.plotly_chart(fig_hour, width="stretch")
 # ============================
 # DELAY DISTRIBUTION
 # ============================
-st.subheader("Delay Distribution")
+#st.subheader("Delay Distribution")
 
 fig_dist = px.histogram(
     df,
@@ -185,7 +185,7 @@ st.plotly_chart(fig_dist, width="stretch")
 # ============================
 # PASSENGER LOAD BY HOUR
 # ============================
-st.subheader("Estimated Passenger Load per Hour")
+#st.subheader("Estimated Passenger Load per Hour")
 
 pax_hour = (
     df.assign(hour=df["dep_time_utc"].dt.hour)
@@ -211,7 +211,7 @@ st.plotly_chart(fig_pax, width="stretch")
 # ============================
 # AVERAGE DELAY BY AIRCRAFT TYPE
 # ============================
-st.subheader("Average Delay by Aircraft Type")
+#st.subheader("Average Delay by Aircraft Type")
 
 aircraft_delay = (
     df.dropna(subset=["aircraft_icao", "delay"])
@@ -247,7 +247,7 @@ st.plotly_chart(fig_aircraft, width="stretch")
 # ============================
 # AVERAGE DELAY BY WEATHER SEVERITY
 # ============================
-st.subheader("Average Delay by Weather Severity")
+#st.subheader("Average Delay by Weather Severity")
 
 df_weather = df.copy()
 
@@ -292,9 +292,9 @@ fig_weather.update_layout(
 st.plotly_chart(fig_weather, width="stretch")
 
 # ============================
-# AVERAGE PASSENGER VOLUME BY FLIGHT TYPE
+# PASSENGER SHARE BY FLIGHT TYPE
 # ============================
-st.subheader("Average Passenger Volume per Flight")
+#st.subheader("Passenger Share by Flight Type")
 
 df_pax = df.dropna(subset=["ac_min_pax", "ac_max_pax"]).copy()
 
@@ -307,33 +307,35 @@ df_pax["flight_type"] = df_pax.apply(
     axis=1
 )
 
-pax_by_type = (
+pax_share = (
     df_pax
     .groupby("flight_type")["avg_pax"]
     .mean()
-    .reset_index()
 )
 
+pax_share_pct = (pax_share / pax_share.sum() * 100).reset_index()
+
 fig_pax = px.bar(
-    pax_by_type,
+    pax_share_pct,
     x="flight_type",
     y="avg_pax",
-    text=pax_by_type["avg_pax"].round(0),
-    title="Average Passenger Volume per Flight"
+    text=pax_share_pct["avg_pax"].round(1),
+    title="Passenger Share by Flight Type (%)"
 )
 
 fig_pax.update_traces(
-    texttemplate="%{text} pax",
+    texttemplate="%{text} %",
     hoverinfo="skip"
 )
 
 fig_pax.update_layout(
     xaxis_title="Flight Type",
-    yaxis_title="Average Passengers per Flight",
+    yaxis_title="Share of Average Passenger Volume (%)",
     showlegend=False
 )
 
 st.plotly_chart(fig_pax, width="stretch")
+
 
 
 
