@@ -244,6 +244,98 @@ fig_aircraft.update_layout(
 
 st.plotly_chart(fig_aircraft, width="stretch")
 
+# ============================
+# AVERAGE DELAY BY WEATHER SEVERITY
+# ============================
+st.subheader("Average Delay by Weather Severity")
+
+df_weather = df.copy()
+
+df_weather["weather_severity"] = (
+    df_weather[["dep_weather_severity", "arr_weather_severity"]]
+    .fillna(0)
+    .max(axis=1)
+)
+
+delay_by_weather = (
+    df_weather
+    .groupby("weather_severity")["delay"]
+    .mean()
+    .reset_index()
+)
+
+delay_by_weather["weather_label"] = delay_by_weather["weather_severity"].map({
+    0: "Normal",
+    1: "Moderate",
+    2: "Severe"
+}).fillna("Severe+")
+
+fig_weather = px.bar(
+    delay_by_weather,
+    x="weather_label",
+    y="delay",
+    text=delay_by_weather["delay"].round(1),
+    title="Average Delay by Weather Severity"
+)
+
+fig_weather.update_traces(
+    texttemplate="%{text} min",
+    hoverinfo="skip"
+)
+
+fig_weather.update_layout(
+    xaxis_title="Weather Severity",
+    yaxis_title="Average Delay (minutes)",
+    showlegend=False
+)
+
+st.plotly_chart(fig_weather, width="stretch")
+
+# ============================
+# AVERAGE PASSENGER VOLUME BY FLIGHT TYPE
+# ============================
+st.subheader("Average Passenger Volume per Flight")
+
+df_pax = df.dropna(subset=["ac_min_pax", "ac_max_pax"]).copy()
+
+df_pax["avg_pax"] = (df_pax["ac_min_pax"] + df_pax["ac_max_pax"]) / 2
+
+df_pax["flight_type"] = df_pax.apply(
+    lambda r: "Domestic"
+    if r["dep_country_ref"] == "Canada" and r["arr_country_ref"] == "Canada"
+    else "International",
+    axis=1
+)
+
+pax_by_type = (
+    df_pax
+    .groupby("flight_type")["avg_pax"]
+    .mean()
+    .reset_index()
+)
+
+fig_pax = px.bar(
+    pax_by_type,
+    x="flight_type",
+    y="avg_pax",
+    text=pax_by_type["avg_pax"].round(0),
+    title="Average Passenger Volume per Flight"
+)
+
+fig_pax.update_traces(
+    texttemplate="%{text} pax",
+    hoverinfo="skip"
+)
+
+fig_pax.update_layout(
+    xaxis_title="Flight Type",
+    yaxis_title="Average Passengers per Flight",
+    showlegend=False
+)
+
+st.plotly_chart(fig_pax, width="stretch")
+
+
 
 # ============================
 # FOOTER
