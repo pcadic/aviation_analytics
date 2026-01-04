@@ -94,25 +94,25 @@ weather_df["is_strong_wind"] = (
     weather_df["arr_is_strong_wind"].fillna(False)
 )
 
-weather_df["is_severe_weather"] = (
-    (weather_df["dep_weather_severity"].fillna(0) >= 2) |
-    (weather_df["arr_weather_severity"].fillna(0) >= 2)
-)
+#weather_df["is_severe_weather"] = (
+#    (weather_df["dep_weather_severity"].fillna(0) >= 2) |
+#    (weather_df["arr_weather_severity"].fillna(0) >= 2)
+#)
 
 
 rain_pct = round(weather_df["is_rain"].mean() * 100, 1)
 fog_pct = round(weather_df["is_fog"].mean() * 100, 1)
 icing_pct = round(weather_df["is_icing"].mean() * 100, 1)
 wind_pct = round(weather_df["is_strong_wind"].mean() * 100, 1)
-severe_pct = round(weather_df["is_severe_weather"].mean() * 100, 1)
+#severe_pct = round(weather_df["is_severe_weather"].mean() * 100, 1)
 
 
-c1, c2, c3, c4, c5 = st.columns(5)
+c1, c2, c3, c4 = st.columns(4)
 c1.metric("Flights affected by rain", f"{rain_pct} %")
 c2.metric("Flights affected by fog", f"{fog_pct} %")
 c3.metric("Flights affected by icing", f"{icing_pct} %")
 c4.metric("Flights affected by strong wind", f"{wind_pct} %")
-c5.metric("Flights with severe weather", f"{severe_pct} %")
+#c5.metric("Flights with severe weather", f"{severe_pct} %")
 
 st.divider()
 
@@ -280,9 +280,9 @@ delay_by_weather = (
 )
 
 delay_by_weather["weather_label"] = delay_by_weather["weather_severity"].map({
-    0: "Normal",
-    1: "Moderate",
-    2: "Severe"
+    0: "Normal (no severe conditions)",
+    1: "Moderate (1 severe condition)",
+    2: "Severe (+2 severe conditions)"
 }).fillna("Severe+")
 
 fig_weather = px.bar(
@@ -290,7 +290,7 @@ fig_weather = px.bar(
     x="weather_label",
     y="delay",
     text=delay_by_weather["delay"].round(1),
-    title="Average Delay by Weather Severity"
+    title="Average Delay by Weather Severity (rain, icing, fog, wind)"
 )
 
 fig_weather.update_traces(
