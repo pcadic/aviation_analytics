@@ -48,25 +48,57 @@ df = df.dropna(subset=[
 # ============================
 # BUILD ROUTES (UNDIRECTED)
 # ============================
-df["route_a"] = df[["dep_icao", "arr_icao"]].min(axis=1)
-df["route_b"] = df[["dep_icao", "arr_icao"]].max(axis=1)
-df["route_id"] = df["route_a"] + "-" + df["route_b"]
-
-routes = (
-    df
-    .groupby("route_id")
-    .agg(
-        flights=("route_id", "count"),
-        dep_lat=("dep_latitude", "mean"),
-        dep_lon=("dep_longitude", "mean"),
-        arr_lat=("arr_latitude", "mean"),
-        arr_lon=("arr_longitude", "mean"),
-    )
-    .reset_index()
+airports_dep = (
+    df[[
+        "dep_icao", "dep_latitude", "dep_longitude"
+    ]]
+    .drop_duplicates()
+    .rename(columns={
+        "dep_icao": "icao",
+        "dep_latitude": "lat",
+        "dep_longitude": "lon"
+    })
 )
 
-# Optional: keep only significant routes
-routes = routes[routes["flights"] >= 2]
+airports_arr = (
+    df[[
+        "arr_icao", "arr_latitude", "arr_longitude"
+    ]]
+    .drop_duplicates()
+    .rename(columns={
+        "arr_icao": "icao",
+        "arr_latitude": "lat",
+        "arr_longitude": "lon"
+    })
+)
+
+airports = pd.concat([airports_dep, airports_arr]).drop_duplicates("icao")
+
+routes = (
+    df.groupby("route_id")
+      .agg(
+          flights=("route_id", "count"),
+          a_icao=("a_icao", "first"),
+          b_icao=("b_icao", "first"),
+      )
+      .reset_index()
+)
+
+routes = (
+    routes
+    .merge(
+        airports.rename(columns={"icao": "a_icao", "lat": "a_lat", "lon": "a_lon"}),
+        on="a_icao",
+        how="left"
+    )
+    .merge(
+        airports.rename(columns={"icao": "b_icao", "lat": "b_lat", "lon": "b_lon"}),
+        on="b_icao",
+        how="left"
+    )
+)
+
+
 
 # ============================
 # PAGE TITLE
@@ -86,8 +118,8 @@ for _, r in routes.iterrows():
     fig.add_trace(
         go.Scattermapbox(
             mode="lines",
-            lat=[r["dep_lat"], r["arr_lat"]],
-            lon=[r["dep_lon"], r["arr_lon"]],
+            lat=[r["a_lat"], r["b_lat"]],
+            lon=[r["a_lon"], r["b_lon"]],
             line=dict(
                 width=min(1 + r["flights"] * 0.6, 8),
                 color="royalblue"
@@ -95,6 +127,7 @@ for _, r in routes.iterrows():
             hoverinfo="skip"
         )
     )
+
 
 fig.update_layout(
     mapbox_style="carto-positron",
