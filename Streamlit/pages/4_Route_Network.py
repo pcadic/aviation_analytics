@@ -45,6 +45,13 @@ df = df.dropna(subset=[
     "arr_latitude", "arr_longitude"
 ])
 
+# Normalize route (A-B == B-A)
+df["a_icao"] = df[["dep_icao", "arr_icao"]].min(axis=1)
+df["b_icao"] = df[["dep_icao", "arr_icao"]].max(axis=1)
+
+df["route_id"] = df["a_icao"] + "-" + df["b_icao"]
+
+
 # ============================
 # BUILD ROUTES (UNDIRECTED)
 # ============================
