@@ -79,6 +79,16 @@ weather_df["is_rain"] = (
     weather_df["arr_is_rain"].fillna(False)
 )
 
+weather_df["is_fog"] = (
+    weather_df["dep_is_fog"].fillna(False) |
+    weather_df["arr_is_fog"].fillna(False)
+)
+
+weather_df["is_icing"] = (
+    weather_df["dep_is_icing"].fillna(False) |
+    weather_df["arr_is_icing"].fillna(False)
+)
+
 weather_df["is_strong_wind"] = (
     weather_df["dep_is_strong_wind"].fillna(False) |
     weather_df["arr_is_strong_wind"].fillna(False)
@@ -91,14 +101,18 @@ weather_df["is_severe_weather"] = (
 
 
 rain_pct = round(weather_df["is_rain"].mean() * 100, 1)
+fog_pct = round(weather_df["is_fog"].mean() * 100, 1)
+icing_pct = round(weather_df["is_icing"].mean() * 100, 1)
 wind_pct = round(weather_df["is_strong_wind"].mean() * 100, 1)
 severe_pct = round(weather_df["is_severe_weather"].mean() * 100, 1)
 
 
-c1, c2, c3 = st.columns(3)
+c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("Flights affected by rain", f"{rain_pct} %")
-c2.metric("Flights affected by strong wind", f"{wind_pct} %")
-c3.metric("Flights with severe weather", f"{severe_pct} %")
+c2.metric("Flights affected by fog", f"{fog_pct} %")
+c3.metric("Flights affected by icing", f"{icing_pct} %")
+c4.metric("Flights affected by strong wind", f"{wind_pct} %")
+c5.metric("Flights with severe weather", f"{severe_pct} %")
 
 st.divider()
 
