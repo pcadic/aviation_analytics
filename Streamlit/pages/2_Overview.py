@@ -25,6 +25,8 @@ df = load_data()
 # =========================
 # BASIC CLEANING
 # =========================
+st.title("✈️ Overview")
+
 df = df.dropna(subset=["dep_icao", "arr_icao", "dep_country_ref", "arr_country_ref"])
 
 # Estimated passengers
