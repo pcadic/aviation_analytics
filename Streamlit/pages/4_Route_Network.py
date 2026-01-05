@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 import plotly.graph_objects as go
 from supabase import create_client
 
@@ -13,7 +14,7 @@ st.set_page_config(
 )
 
 st.title("🗺️ CYVR Route Network")
-st.caption("Bidirectional flight routes aggregated from enriched flight data")
+st.caption("Visualization of flight routes and destination concentration")
 
 # ============================
 # SUPABASE
@@ -40,8 +41,7 @@ def load_data():
             arr_latitude,
             arr_longitude,
             dep_country_ref,
-            arr_country_ref,
-            avg_pax_estimated
+            arr_country_ref
         """)
         .execute()
     )
@@ -59,14 +59,12 @@ df = df.dropna(subset=[
     "dep_city", "arr_city"
 ])
 
-# ============================
-# BIDIRECTIONAL ROUTES
-# ============================
-df["route_id"] = df.apply(
-    lambda r: "-".join(sorted([r["dep_icao"], r["arr_icao"]])),
-    axis=1
-)
+# Focus CYVR hub
+df = df[(df["dep_icao"] == "CYVR") | (df["arr_icao"] == "CYVR")]
 
+# ============================
+# DOMESTIC / INTERNATIONAL
+# ============================
 df["route_type"] = df.apply(
     lambda r: "Domestic"
     if r["dep_country_ref"] == r["arr_country_ref"]
@@ -74,9 +72,6 @@ df["route_type"] = df.apply(
     axis=1
 )
 
-# ============================
-# FILTER — DOMESTIC / INTERNATIONAL
-# ============================
 route_filter = st.selectbox(
     "Route type",
     ["All", "Domestic", "International"]
@@ -86,13 +81,17 @@ if route_filter != "All":
     df = df[df["route_type"] == route_filter]
 
 # ============================
-# AGGREGATE ROUTES
+# BIDIRECTIONAL ROUTES
 # ============================
+df["route_id"] = df.apply(
+    lambda r: "-".join(sorted([r["dep_icao"], r["arr_icao"]])),
+    axis=1
+)
+
 routes = (
     df.groupby("route_id")
       .agg(
           flights=("route_id", "count"),
-          avg_pax=("avg_pax_estimated", "mean"),
           dep_lat=("dep_latitude", "first"),
           dep_lon=("dep_longitude", "first"),
           arr_lat=("arr_latitude", "first"),
@@ -104,78 +103,91 @@ routes = (
 )
 
 # ============================
-# COLOR NORMALIZATION (ROBUST)
-# ============================
-min_f = routes["flights"].min()
-max_f = routes["flights"].max()
-
-if min_f == max_f:
-    routes["norm"] = 0.5
-else:
-    routes["norm"] = (routes["flights"] - min_f) / (max_f - min_f)
-
-# ============================
-# MAP
+# MAP — ROUTES
 # ============================
 fig = go.Figure()
 
-for _, row in routes.iterrows():
-    # Blue → Red gradient
-    red = int(255 * row["norm"])
-    blue = int(255 * (1 - row["norm"]))
-
-    fig.add_trace(go.Scattergeo(
-        lat=[row["dep_lat"], row["arr_lat"]],
-        lon=[row["dep_lon"], row["arr_lon"]],
-        mode="lines",
-        line=dict(
-            width=2,
-            color=f"rgb({red},0,{blue})"
-        ),
-        hoverinfo="skip",
-        showlegend=False
-    ))
+fig.add_trace(go.Scattergeo(
+    lat=routes.apply(lambda r: [r.dep_lat, r.arr_lat], axis=1).explode(),
+    lon=routes.apply(lambda r: [r.dep_lon, r.arr_lon], axis=1).explode(),
+    mode="lines",
+    line=dict(
+        width=2,
+        color=routes["flights"],
+        colorscale="RdBu",
+        reversescale=True,
+        cmin=routes["flights"].min(),
+        cmax=routes["flights"].max(),
+        colorbar=dict(title="Flights per route")
+    ),
+    text=routes.apply(
+        lambda r: f"{r.dep_city} ⇄ {r.arr_city}<br>Flights: {r.flights}",
+        axis=1
+    ),
+    hoverinfo="text",
+    showlegend=False
+))
 
 fig.update_layout(
-    margin=dict(l=0, r=0, t=0, b=0),
     geo=dict(
         projection_type="natural earth",
-        center=dict(lat=49.1947, lon=-123.1792),  # CYVR
+        center=dict(lat=49.1947, lon=-123.1792),
         projection_scale=5,
         showcountries=True,
         showland=True,
-        landcolor="rgb(240,240,240)",
-    )
+        landcolor="rgb(240,240,240)"
+    ),
+    margin=dict(l=0, r=0, t=0, b=0)
 )
 
 st.plotly_chart(fig, use_container_width=True)
 
 # ============================
-# TOP 5 ROUTES TABLE
+# BAR CHART — TOP DESTINATIONS
 # ============================
-st.subheader("Top 5 Routes by Average Passenger Capacity")
+st.subheader("Top Destinations by Number of Flights")
 
-top5 = (
-    routes.sort_values("avg_pax", ascending=False)
-          .head(5)
-          .assign(
-              route=lambda d: d["dep_city"] + " – " + d["arr_city"],
-              avg_pax=lambda d: d["avg_pax"].round(0).astype(int)
-          )
+max_routes = len(routes)
+top_n = st.slider(
+    "Number of routes displayed",
+    min_value=1,
+    max_value=max_routes,
+    value=min(10, max_routes)
 )
 
-st.dataframe(
-    top5[["route", "avg_pax"]]
-    .rename(columns={
-        "route": "Route",
-        "avg_pax": "Avg passengers per flight"
-    }),
-    use_container_width=True
+destinations = (
+    df.assign(
+        destination=lambda d: d.apply(
+            lambda r: r.arr_city if r.dep_icao == "CYVR" else r.dep_city,
+            axis=1
+        )
+    )
+    .groupby("destination")
+    .size()
+    .reset_index(name="flights")
+    .sort_values("flights", ascending=False)
+    .head(top_n)
 )
+
+fig_bar = px.bar(
+    destinations,
+    x="flights",
+    y="destination",
+    orientation="h",
+    title="Most Frequent Destinations from CYVR"
+)
+
+fig_bar.update_layout(
+    xaxis_title="Number of Flights",
+    yaxis_title="",
+    showlegend=False
+)
+
+st.plotly_chart(fig_bar, use_container_width=True)
 
 # ============================
 # FOOTER
 # ============================
 st.caption(
-    "Routes derived from v_flights_enriched · Passenger capacity estimated from aircraft reference data"
+    "Routes aggregated from v_flights_enriched · Bidirectional logic applied · CYVR hub focus"
 )
