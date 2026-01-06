@@ -1,7 +1,15 @@
+from supabase import create_client
 import streamlit as st
 import pandas as pd
 import pydeck as pdk
 import plotly.express as px
+
+def get_supabase():
+    return create_client(
+        st.secrets["SUPABASE_URL"],
+        st.secrets["SUPABASE_KEY"]
+    )
+
 
 # ======================
 # CONFIG
@@ -18,8 +26,10 @@ HUB = "CYVR"
 # ======================
 @st.cache_data(ttl=600)
 def load_data():
-    return (
-        st.session_state.supabase
+    supabase = get_supabase()
+
+    response = (
+        supabase
         .table("v_flights_enriched")
         .select(
             """
@@ -27,10 +37,12 @@ def load_data():
             arr_icao, arr_city, arr_country_ref, arr_latitude, arr_longitude
             """
         )
-        .or_(f"dep_icao.eq.{HUB},arr_icao.eq.{HUB}")
+        .or_("dep_icao.eq.CYVR,arr_icao.eq.CYVR")
         .execute()
-        .data
     )
+
+    return response.data
+
 
 df = pd.DataFrame(load_data())
 
