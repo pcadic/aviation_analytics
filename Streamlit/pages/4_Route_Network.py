@@ -107,26 +107,20 @@ routes = (
 # ============================
 fig = go.Figure()
 
-fig.add_trace(go.Scattergeo(
-    lat=routes.apply(lambda r: [r.dep_lat, r.arr_lat], axis=1).explode(),
-    lon=routes.apply(lambda r: [r.dep_lon, r.arr_lon], axis=1).explode(),
-    mode="lines",
-    line=dict(
-        width=2,
-        color=routes["flights"],
-        colorscale="RdBu",
-        reversescale=True,
-        cmin=routes["flights"].min(),
-        cmax=routes["flights"].max(),
-        colorbar=dict(title="Flights per route")
-    ),
-    text=routes.apply(
-        lambda r: f"{r.dep_city} ⇄ {r.arr_city}<br>Flights: {r.flights}",
-        axis=1
-    ),
-    hoverinfo="text",
-    showlegend=False
-))
+for _, r in routes.iterrows():
+    fig.add_trace(
+        go.Scattergeo(
+            lat=[r.dep_lat, r.arr_lat],
+            lon=[r.dep_longitude, r.arr_longitude],
+            mode="lines",
+            line=dict(
+                width=2,
+                color=r["color"]  # ✅ une seule couleur
+            ),
+            hoverinfo="skip",
+            showlegend=False
+        )
+    )
 
 fig.update_layout(
     geo=dict(
@@ -139,6 +133,26 @@ fig.update_layout(
     ),
     margin=dict(l=0, r=0, t=0, b=0)
 )
+
+fig.add_trace(
+    go.Scattergeo(
+        lat=[None],
+        lon=[None],
+        mode="markers",
+        marker=dict(
+            size=0,
+            colorscale="RdBu",
+            showscale=True,
+            cmin=routes["flight_count"].min(),
+            cmax=routes["flight_count"].max(),
+            colorbar=dict(
+                title="Number of flights per route"
+            )
+        ),
+        showlegend=False
+    )
+)
+
 
 st.plotly_chart(fig, use_container_width=True)
 
