@@ -49,7 +49,7 @@ df = df.dropna(subset=[
 ])
 
 # ============================
-# HUB FILTER (CYVR NETWORK)
+# HUB FILTER
 # ============================
 df = df[(df.dep_icao == HUB) | (df.arr_icao == HUB)]
 
@@ -73,15 +73,10 @@ if route_filter != "All":
     df = df[df.route_type == route_filter]
 
 # ============================
-# NORMALISE DESTINATIONS (FROM HUB)
+# NORMALISE DESTINATIONS
 # ============================
-df["dest_city"] = df.apply(
+df["destination_city"] = df.apply(
     lambda r: r.arr_city if r.dep_icao == HUB else r.dep_city,
-    axis=1
-)
-
-df["dest_icao"] = df.apply(
-    lambda r: r.arr_icao if r.dep_icao == HUB else r.dep_icao,
     axis=1
 )
 
@@ -96,26 +91,17 @@ df["dest_lon"] = df.apply(
 )
 
 # ============================
-# UNIQUE DESTINATIONS ONLY
+# HEATMAP — DESTINATION DENSITY
 # ============================
-destinations = (
-    df[["dest_city", "dest_icao", "dest_lat", "dest_lon"]]
-    .drop_duplicates()
-)
+st.subheader("CYVR Route Network – Destination Density")
 
-# ============================
-# MAP 1 — OSM AIRPORT MAP
-# ============================
-st.subheader("CYVR Route Network – Airports")
-
-fig_map = px.scatter_mapbox(
-    destinations,
+fig_map = px.density_mapbox(
+    df,
     lat="dest_lat",
     lon="dest_lon",
-    hover_name="dest_city",
-    hover_data={"dest_icao": True},
+    radius=25,
     zoom=3,
-    height=600
+    height=650
 )
 
 fig_map.update_layout(
@@ -124,34 +110,65 @@ fig_map.update_layout(
     showlegend=False
 )
 
-st.plotly_chart(fig_map, use_container_width=True)
-
 # ============================
-# MAP 2 — HEATMAP (DESTINATION DENSITY)
+# CYVR HUB — RED AIRCRAFT ICON
 # ============================
-st.subheader("Destination Density Heatmap")
+hub_row = df[df.dep_icao == HUB].iloc[0]
 
-fig_heat = px.density_mapbox(
-    df,
-    lat="dest_lat",
-    lon="dest_lon",
-    radius=25,
-    zoom=3,
-    height=600
-)
-
-fig_heat.update_layout(
-    mapbox_style="open-street-map",
-    margin=dict(l=0, r=0, t=0, b=0),
+fig_map.add_scattermapbox(
+    lat=[hub_row.dep_latitude],
+    lon=[hub_row.dep_longitude],
+    mode="markers+text",
+    marker=dict(
+        size=22,
+        color="red",
+        symbol="airport"
+    ),
+    text=["Vancouver (CYVR)"],
+    textposition="top center",
+    hoverinfo="skip",
     showlegend=False
 )
 
-st.plotly_chart(fig_heat, use_container_width=True)
+st.plotly_chart(fig_map, use_container_width=True)
 
 # ============================
-# FOOTER
+# TOP 10 ROUTES — NO NUMBERS
 # ============================
-st.caption(
-    "Network visualization based on observed routes from Vancouver (CYVR). "
-    "Visualization focuses on structure rather than volume."
+st.subheader("Top Routes from CYVR")
+
+df["route_name"] = df.apply(
+    lambda r: (
+        f"{r.dep_city} – {r.arr_city}"
+        if r.dep_icao == HUB
+        else f"{r.arr_city} – {r.dep_city}"
+    ),
+    axis=1
 )
+
+top_routes = (
+    df["route_name"]
+    .value_counts()
+    .head(10)
+    .sort_values(ascending=True)
+)
+
+fig_bar = px.bar(
+    top_routes,
+    x=top_routes.values,
+    y=top_routes.index,
+    orientation="h"
+)
+
+fig_bar.update_traces(
+    hoverinfo="skip"
+)
+
+fig_bar.update_layout(
+    xaxis=dict(visible=False),   # ← cache l’axe et les valeurs
+    yaxis_title="",
+    showlegend=False,
+    margin=dict(l=0, r=0, t=30, b=0)
+)
+
+st.plotly_chart(fig_bar, use_container_width=True)
