@@ -73,7 +73,7 @@ if route_filter != "All":
     df = df[df.route_type == route_filter]
 
 # ============================
-# NORMALISE DESTINATION
+# NORMALISE DESTINATIONS
 # ============================
 df["destination_city"] = df.apply(
     lambda r: r.arr_city if r.dep_icao == HUB else r.dep_city,
@@ -91,7 +91,7 @@ df["dest_lon"] = df.apply(
 )
 
 # ============================
-# HEATMAP — ROUTE DENSITY
+# HEATMAP — DESTINATION DENSITY
 # ============================
 st.subheader("CYVR Route Network – Destination Density")
 
@@ -111,7 +111,7 @@ fig_map.update_layout(
 )
 
 # ============================
-# CYVR HUB MARKER (RED PIN)
+# CYVR HUB — RED AIRCRAFT ICON
 # ============================
 hub_row = df[df.dep_icao == HUB].iloc[0]
 
@@ -120,8 +120,9 @@ fig_map.add_scattermapbox(
     lon=[hub_row.dep_longitude],
     mode="markers+text",
     marker=dict(
-        size=16,
-        color="red"
+        size=22,
+        color="red",
+        symbol="airport"
     ),
     text=["Vancouver (CYVR)"],
     textposition="top center",
@@ -132,11 +133,10 @@ fig_map.add_scattermapbox(
 st.plotly_chart(fig_map, use_container_width=True)
 
 # ============================
-# TOP 10 ROUTES (BAR CHART)
+# TOP 10 ROUTES — NO NUMBERS
 # ============================
 st.subheader("Top Routes from CYVR")
 
-# Build route name City A – City B
 df["route_name"] = df.apply(
     lambda r: (
         f"{r.dep_city} – {r.arr_city}"
@@ -160,8 +160,12 @@ fig_bar = px.bar(
     orientation="h"
 )
 
+fig_bar.update_traces(
+    hoverinfo="skip"
+)
+
 fig_bar.update_layout(
-    xaxis_title="Flights (relative ranking)",
+    xaxis=dict(visible=False),   # ← cache l’axe et les valeurs
     yaxis_title="",
     showlegend=False,
     margin=dict(l=0, r=0, t=30, b=0)
