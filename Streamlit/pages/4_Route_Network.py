@@ -111,7 +111,7 @@ fig_map.update_layout(
 )
 
 # ============================
-# CYVR HUB — RED AIRCRAFT ICON
+# CYVR HUB — SMALL RED POINT
 # ============================
 hub_row = df[df.dep_icao == HUB].iloc[0]
 
@@ -120,9 +120,9 @@ fig_map.add_scattermapbox(
     lon=[hub_row.dep_longitude],
     mode="markers+text",
     marker=dict(
-        size=22,
+        size=10,
         color="red",
-        symbol="airport"
+        opacity=0.9
     ),
     text=["Vancouver (CYVR)"],
     textposition="top center",
@@ -133,7 +133,7 @@ fig_map.add_scattermapbox(
 st.plotly_chart(fig_map, use_container_width=True)
 
 # ============================
-# TOP 10 ROUTES — NO NUMBERS
+# TOP 10 ROUTES — VISUAL ONLY
 # ============================
 st.subheader("Top Routes from CYVR")
 
@@ -155,7 +155,7 @@ top_routes = (
 
 fig_bar = px.bar(
     top_routes,
-    x=top_routes.values,
+    x=top_routes.values,   # tailles réelles conservées
     y=top_routes.index,
     orientation="h"
 )
@@ -165,7 +165,7 @@ fig_bar.update_traces(
 )
 
 fig_bar.update_layout(
-    xaxis=dict(visible=False),   # ← cache l’axe et les valeurs
+    xaxis=dict(visible=False),  # axe caché MAIS échelle conservée
     yaxis_title="",
     showlegend=False,
     margin=dict(l=0, r=0, t=30, b=0)
