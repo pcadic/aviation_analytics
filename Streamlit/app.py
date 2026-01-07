@@ -1,4 +1,4 @@
-import streamlit as st
+vieimport streamlit as st
 
 st.set_page_config(
     page_title="Aviation Analytics",
@@ -12,7 +12,7 @@ Welcome to the Aviation Analytics portfolio project.
 
 Use the menu on the left to explore:
 - Data Pipeline
-- Flight Statistics
-- Weather Analysis
+- Flight Overview
+- Operational insights
 - Machine Learning (coming soon)
 """)
