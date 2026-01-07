@@ -49,7 +49,7 @@ df = df.dropna(subset=[
 ])
 
 # ============================
-# HUB FILTER (CYVR NETWORK)
+# HUB NETWORK ONLY
 # ============================
 df = df[(df.dep_icao == HUB) | (df.arr_icao == HUB)]
 
@@ -73,18 +73,8 @@ if route_filter != "All":
     df = df[df.route_type == route_filter]
 
 # ============================
-# NORMALISE DESTINATIONS (FROM HUB)
+# NORMALISE DESTINATIONS
 # ============================
-df["dest_city"] = df.apply(
-    lambda r: r.arr_city if r.dep_icao == HUB else r.dep_city,
-    axis=1
-)
-
-df["dest_icao"] = df.apply(
-    lambda r: r.arr_icao if r.dep_icao == HUB else r.dep_icao,
-    axis=1
-)
-
 df["dest_lat"] = df.apply(
     lambda r: r.arr_latitude if r.dep_icao == HUB else r.dep_latitude,
     axis=1
@@ -96,62 +86,39 @@ df["dest_lon"] = df.apply(
 )
 
 # ============================
-# UNIQUE DESTINATIONS ONLY
+# HEATMAP — ROUTE DENSITY
 # ============================
-destinations = (
-    df[["dest_city", "dest_icao", "dest_lat", "dest_lon"]]
-    .drop_duplicates()
-)
+st.subheader("CYVR Route Network – Destination Density")
 
-# ============================
-# MAP 1 — OSM AIRPORT MAP
-# ============================
-st.subheader("CYVR Route Network – Airports")
-
-fig_map = px.scatter_mapbox(
-    destinations,
-    lat="dest_lat",
-    lon="dest_lon",
-    hover_name="dest_city",
-    hover_data={"dest_icao": True},
-    zoom=3,
-    height=600
-)
-
-fig_map.update_layout(
-    mapbox_style="open-street-map",
-    margin=dict(l=0, r=0, t=0, b=0),
-    showlegend=False
-)
-
-st.plotly_chart(fig_map, use_container_width=True)
-
-# ============================
-# MAP 2 — HEATMAP (DESTINATION DENSITY)
-# ============================
-st.subheader("Destination Density Heatmap")
-
-fig_heat = px.density_mapbox(
+fig = px.density_mapbox(
     df,
     lat="dest_lat",
     lon="dest_lon",
     radius=25,
     zoom=3,
-    height=600
+    height=650
 )
 
-fig_heat.update_layout(
+fig.update_layout(
     mapbox_style="open-street-map",
     margin=dict(l=0, r=0, t=0, b=0),
     showlegend=False
 )
 
-st.plotly_chart(fig_heat, use_container_width=True)
+# ============================
+# ADD CYVR HUB (STRATEGIC ANCHOR)
+# ============================
+hub_row = df[df.dep_icao == HUB].iloc[0]
 
-# ============================
-# FOOTER
-# ============================
-st.caption(
-    "Network visualization based on observed routes from Vancouver (CYVR). "
-    "Visualization focuses on structure rather than volume."
+fig.add_scattermapbox(
+    lat=[hub_row.dep_latitude],
+    lon=[hub_row.dep_longitude],
+    mode="markers+text",
+    marker=dict(size=14, color="black"),
+    text=["Vancouver (CYVR)"],
+    textposition="top center",
+    hoverinfo="skip",
+    showlegend=False
 )
+
+st.plotly_chart(fig, use_container_width=True)
