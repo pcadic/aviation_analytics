@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+import plotly.express as px
 from supabase import create_client
 
 # ============================
@@ -40,7 +40,7 @@ def load_data():
 df = load_data()
 
 # ============================
-# CLEAN
+# CLEANING
 # ============================
 df = df.dropna(subset=[
     "dep_latitude", "dep_longitude",
@@ -49,12 +49,12 @@ df = df.dropna(subset=[
 ])
 
 # ============================
-# HUB FILTER
+# HUB FILTER (CYVR NETWORK)
 # ============================
 df = df[(df.dep_icao == HUB) | (df.arr_icao == HUB)]
 
 # ============================
-# DOMESTIC / INTERNATIONAL
+# DOMESTIC / INTERNATIONAL FILTER
 # ============================
 df["route_type"] = df.apply(
     lambda r: "Domestic"
@@ -73,10 +73,15 @@ if route_filter != "All":
     df = df[df.route_type == route_filter]
 
 # ============================
-# DESTINATION NORMALISATION
+# NORMALISE DESTINATIONS (FROM HUB)
 # ============================
-df["destination_city"] = df.apply(
+df["dest_city"] = df.apply(
     lambda r: r.arr_city if r.dep_icao == HUB else r.dep_city,
+    axis=1
+)
+
+df["dest_icao"] = df.apply(
+    lambda r: r.arr_icao if r.dep_icao == HUB else r.dep_icao,
     axis=1
 )
 
@@ -91,124 +96,62 @@ df["dest_lon"] = df.apply(
 )
 
 # ============================
-# AGGREGATION
+# UNIQUE DESTINATIONS ONLY
 # ============================
-routes = (
-    df.groupby(
-        ["destination_city", "dest_lat", "dest_lon"],
-        as_index=False
-    )
-    .size()
-    .rename(columns={"size": "flight_count"})
+destinations = (
+    df[["dest_city", "dest_icao", "dest_lat", "dest_lon"]]
+    .drop_duplicates()
 )
 
 # ============================
-# COLOR SCALE (BLUE → RED)
+# MAP 1 — OSM AIRPORT MAP
 # ============================
-min_f = routes.flight_count.min()
-max_f = routes.flight_count.max()
+st.subheader("CYVR Route Network – Airports")
 
-def color_scale(v):
-    if max_f == min_f:
-        return "rgb(0,120,255)"
-    ratio = (v - min_f) / (max_f - min_f)
-    r = int(255 * ratio)
-    g = int(80 * (1 - ratio))
-    b = int(255 * (1 - ratio))
-    return f"rgb({r},{g},{b})"
-
-routes["color"] = routes.flight_count.apply(color_scale)
-
-# ============================
-# MAP
-# ============================
-fig = go.Figure()
-
-# HUB
-hub_row = df[df.dep_icao == HUB].iloc[0]
-hub_lat = hub_row.dep_latitude
-hub_lon = hub_row.dep_longitude
-
-fig.add_trace(
-    go.Scattergeo(
-        lat=[hub_lat],
-        lon=[hub_lon],
-        mode="markers+text",
-        text=["Vancouver (CYVR)"],
-        textposition="top center",
-        marker=dict(size=12, color="black"),
-        showlegend=False
-    )
+fig_map = px.scatter_mapbox(
+    destinations,
+    lat="dest_lat",
+    lon="dest_lon",
+    hover_name="dest_city",
+    hover_data={"dest_icao": True},
+    zoom=3,
+    height=600
 )
 
-# ROUTES + DESTINATIONS
-for _, r in routes.iterrows():
-    fig.add_trace(
-        go.Scattergeo(
-            lat=[hub_lat, r.dest_lat],
-            lon=[hub_lon, r.dest_lon],
-            mode="lines",
-            line=dict(width=2, color=r.color),
-            showlegend=False,
-            hoverinfo="skip"
-        )
-    )
-
-    fig.add_trace(
-        go.Scattergeo(
-            lat=[r.dest_lat],
-            lon=[r.dest_lon],
-            mode="markers",
-            marker=dict(size=6, color=r.color),
-            hovertext=f"{r.destination_city}<br>{r.flight_count} flights",
-            hoverinfo="text",
-            showlegend=False
-        )
-    )
-
-fig.update_layout(
-    title="CYVR Route Network",
-    geo=dict(
-        scope="north america",
-        projection_type="natural earth",
-        showland=True,
-        landcolor="rgb(245,245,245)",
-        showcountries=True,
-        countrycolor="rgb(200,200,200)"
-    ),
-    margin=dict(l=0, r=0, t=50, b=0)
-)
-
-st.plotly_chart(fig, width="stretch")
-
-# ============================
-# BAR CHART — TOP DESTINATIONS
-# ============================
-st.subheader("Top Destinations by Number of Flights")
-
-routes_sorted = routes.sort_values("flight_count", ascending=False)
-
-top_n = st.slider(
-    "Number of destinations",
-    min_value=1,
-    max_value=len(routes_sorted),
-    value=min(10, len(routes_sorted))
-)
-
-fig_bar = go.Figure(
-    go.Bar(
-        x=routes_sorted.flight_count.head(top_n),
-        y=routes_sorted.destination_city.head(top_n),
-        orientation="h",
-        marker_color="steelblue"
-    )
-)
-
-fig_bar.update_layout(
-    xaxis_title="Number of flights",
-    yaxis_title="",
-    yaxis=dict(autorange="reversed"),
+fig_map.update_layout(
+    mapbox_style="open-street-map",
+    margin=dict(l=0, r=0, t=0, b=0),
     showlegend=False
 )
 
-st.plotly_chart(fig_bar, width="stretch")
+st.plotly_chart(fig_map, use_container_width=True)
+
+# ============================
+# MAP 2 — HEATMAP (DESTINATION DENSITY)
+# ============================
+st.subheader("Destination Density Heatmap")
+
+fig_heat = px.density_mapbox(
+    df,
+    lat="dest_lat",
+    lon="dest_lon",
+    radius=25,
+    zoom=3,
+    height=600
+)
+
+fig_heat.update_layout(
+    mapbox_style="open-street-map",
+    margin=dict(l=0, r=0, t=0, b=0),
+    showlegend=False
+)
+
+st.plotly_chart(fig_heat, use_container_width=True)
+
+# ============================
+# FOOTER
+# ============================
+st.caption(
+    "Network visualization based on observed routes from Vancouver (CYVR). "
+    "Visualization focuses on structure rather than volume."
+)
