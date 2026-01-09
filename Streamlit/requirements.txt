@@ -3,3 +3,5 @@ supabase
 pandas
 plotly
 python-dateutil
+numpy
+scikit-learn
