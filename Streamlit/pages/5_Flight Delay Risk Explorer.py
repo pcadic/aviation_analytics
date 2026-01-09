@@ -44,8 +44,7 @@ def load_data():
             duration,
             aircraft_type,
             avg_pax_estimated,
-            dep_weather_severity, arr_weather_severity,
-            dep_is_rain, dep_is_fog, dep_is_icing, dep_is_strong_wind
+            dep_weather_severity, arr_weather_severity
         """)
         .execute()
     )
@@ -53,36 +52,34 @@ def load_data():
 
 df = load_data()
 
-# ============================
-# FEATURE ENGINEERING
-# ============================
 st.title("🧠 Flight Delay Risk Explorer")
-st.caption("Machine learning models predicting the probability of flight delays")
+st.caption("Predicting the probability of flight delays using machine learning")
 
-# Unified delay logic
-df["delay_minutes"] = np.where(
+# ============================
+# TARGET ENGINEERING (FIXED)
+# ============================
+delay_minutes = np.where(
     df["dep_delayed"].notna(),
     df["dep_delayed"],
     df["arr_delayed"]
-).fillna(0)
+)
 
+df["delay_minutes"] = pd.Series(delay_minutes, index=df.index).fillna(0)
 df["delay_risk"] = (df["delay_minutes"] > 15).astype(int)
 
-# Route type
+# ============================
+# FEATURE ENGINEERING
+# ============================
 df["route_type"] = np.where(
     df["dep_country_ref"] == df["arr_country_ref"],
     "Domestic",
     "International"
 )
 
-# Weather severity (max of dep/arr)
 df["weather_severity"] = df[
     ["dep_weather_severity", "arr_weather_severity"]
 ].max(axis=1)
 
-# ============================
-# SELECT FEATURES
-# ============================
 features = [
     "duration",
     "avg_pax_estimated",
@@ -100,14 +97,15 @@ y = df_model["delay_risk"]
 # TRAIN / TEST SPLIT
 # ============================
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y,
+    X,
+    y,
     test_size=0.25,
     random_state=42,
     stratify=y
 )
 
 # ============================
-# PREPROCESSING PIPELINE
+# PREPROCESSING
 # ============================
 numeric_features = [
     "duration",
@@ -120,22 +118,20 @@ categorical_features = [
     "route_type"
 ]
 
-numeric_transformer = Pipeline(steps=[
+numeric_transformer = Pipeline([
     ("imputer", SimpleImputer(strategy="median")),
     ("scaler", StandardScaler())
 ])
 
-categorical_transformer = Pipeline(steps=[
+categorical_transformer = Pipeline([
     ("imputer", SimpleImputer(strategy="most_frequent")),
     ("encoder", OneHotEncoder(handle_unknown="ignore"))
 ])
 
-preprocessor = ColumnTransformer(
-    transformers=[
-        ("num", numeric_transformer, numeric_features),
-        ("cat", categorical_transformer, categorical_features)
-    ]
-)
+preprocessor = ColumnTransformer([
+    ("num", numeric_transformer, numeric_features),
+    ("cat", categorical_transformer, categorical_features)
+])
 
 # ============================
 # MODELS
@@ -149,7 +145,6 @@ models = {
     )
 }
 
-# Optional XGBoost
 try:
     from xgboost import XGBClassifier
     models["XGBoost"] = XGBClassifier(
@@ -161,20 +156,19 @@ try:
         eval_metric="logloss",
         random_state=42
     )
-    xgb_available = True
 except ImportError:
-    xgb_available = False
+    st.warning("XGBoost not available in this environment")
 
 # ============================
-# TRAIN & EVALUATE
+# TRAIN & ROC
 # ============================
-st.subheader("📊 Model Performance (ROC-AUC)")
+st.subheader("📊 Model Performance – ROC AUC")
 
-roc_results = {}
 roc_curves = {}
+roc_scores = {}
 
 for name, model in models.items():
-    pipe = Pipeline(steps=[
+    pipe = Pipeline([
         ("preprocessor", preprocessor),
         ("model", model)
     ])
@@ -182,26 +176,22 @@ for name, model in models.items():
     pipe.fit(X_train, y_train)
     y_proba = pipe.predict_proba(X_test)[:, 1]
     
-    roc_results[name] = roc_auc_score(y_test, y_proba)
-    fpr, tpr, _ = roc_curve(y_test, y_proba)
-    roc_curves[name] = (fpr, tpr)
+    roc_scores[name] = roc_auc_score(y_test, y_proba)
+    roc_curves[name] = roc_curve(y_test, y_proba)
 
-# ============================
-# ROC CURVE
-# ============================
-fig_roc = go.Figure()
+fig = go.Figure()
 
-for name, (fpr, tpr) in roc_curves.items():
-    fig_roc.add_trace(
+for name, (fpr, tpr, _) in roc_curves.items():
+    fig.add_trace(
         go.Scatter(
             x=fpr,
             y=tpr,
             mode="lines",
-            name=f"{name} (AUC={roc_results[name]:.2f})"
+            name=f"{name} (AUC={roc_scores[name]:.2f})"
         )
     )
 
-fig_roc.add_trace(
+fig.add_trace(
     go.Scatter(
         x=[0, 1],
         y=[0, 1],
@@ -211,54 +201,45 @@ fig_roc.add_trace(
     )
 )
 
-fig_roc.update_layout(
+fig.update_layout(
     xaxis_title="False Positive Rate",
     yaxis_title="True Positive Rate",
     title="ROC Curve – Delay Risk Prediction"
 )
 
-st.plotly_chart(fig_roc, use_container_width=True)
+st.plotly_chart(fig, use_container_width=True)
 
 # ============================
-# FEATURE IMPORTANCE (TREE MODELS)
+# FEATURE IMPORTANCE
 # ============================
 st.subheader("🔍 Feature Importance")
 
-selected_model = st.selectbox(
-    "Select model",
-    [m for m in models.keys() if m != "Logistic Regression"]
-)
+tree_models = [m for m in models if m != "Logistic Regression"]
+selected_model = st.selectbox("Model", tree_models)
 
-model = models[selected_model]
-
-pipe = Pipeline(steps=[
+pipe = Pipeline([
     ("preprocessor", preprocessor),
-    ("model", model)
+    ("model", models[selected_model])
 ])
 
 pipe.fit(X_train, y_train)
 
-# Extract feature names
-feature_names = (
-    pipe.named_steps["preprocessor"]
-    .get_feature_names_out()
-)
-
+feature_names = pipe.named_steps["preprocessor"].get_feature_names_out()
 importances = pipe.named_steps["model"].feature_importances_
 
 fi = (
     pd.DataFrame({
-        "feature": feature_names,
-        "importance": importances
+        "Feature": feature_names,
+        "Importance": importances
     })
-    .sort_values("importance", ascending=False)
+    .sort_values("Importance", ascending=False)
     .head(15)
 )
 
 fig_fi = px.bar(
-    fi.sort_values("importance"),
-    x="importance",
-    y="feature",
+    fi.sort_values("Importance"),
+    x="Importance",
+    y="Feature",
     orientation="h"
 )
 
@@ -269,11 +250,3 @@ fig_fi.update_layout(
 )
 
 st.plotly_chart(fig_fi, use_container_width=True)
-
-# ============================
-# FOOTER
-# ============================
-st.caption(
-    "Models trained on real flight, aircraft and weather data. "
-    "Missing values handled via preprocessing pipelines."
-)
