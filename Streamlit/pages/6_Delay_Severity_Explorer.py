@@ -148,8 +148,8 @@ preprocessor = ColumnTransformer([
 # ============================
 models = {
     "Logistic Regression": LogisticRegression(
-        multi_class="multinomial",
-        max_iter=1000
+        max_iter=1000,
+        solver="lbfgs"
     ),
     "Random Forest": RandomForestClassifier(
         n_estimators=300,
