@@ -180,14 +180,26 @@ fig_dist.update_layout(
 st.plotly_chart(fig_dist, use_container_width=True)
 
 st.markdown("""
-This chart shows the distribution of predicted delay probabilities
-across the evaluated flights.
+**What this chart shows**
 
-Most flights are associated with low to moderate delay risk,
-while a smaller subset exhibits high predicted probabilities.
-High-risk predictions typically correspond to adverse weather
-conditions and increased operational complexity.
+This distribution represents the predicted probability of delay for each flight
+in the test dataset, as estimated by the Random Forest model.
+
+Most flights cluster around low to moderate delay risk, indicating that under
+normal operational and weather conditions, delays are relatively unlikely.
+A smaller but significant tail of flights exhibits high predicted risk.
+
+**Interpretation**
+
+High predicted delay probabilities are typically associated with:
+• Higher weather severity (departure or arrival)
+• Longer flight duration
+• Specific aircraft categories operating under adverse conditions
+
+This confirms that delays are not random events but can be anticipated
+based on measurable operational and environmental factors.
 """)
+
 
 # ============================
 # ROC CURVES
@@ -234,6 +246,26 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
+st.markdown("""
+**What this chart shows**
+
+The ROC curve evaluates each model’s ability to distinguish between delayed
+and non-delayed flights across all possible classification thresholds.
+
+The diagonal line represents a random classifier, while curves above this line
+indicate predictive skill.
+
+**Interpretation**
+
+The Random Forest model achieves a higher ROC-AUC score than Logistic Regression,
+demonstrating a stronger ability to rank flights by delay risk.
+
+This suggests that non-linear relationships — especially interactions between
+weather severity, route characteristics, and aircraft type — play a critical
+role in delay occurrence, which linear models struggle to capture.
+""")
+
+
 # ============================
 # FEATURE IMPORTANCE
 # ============================
@@ -265,3 +297,26 @@ fig_fi.update_layout(
 )
 
 st.plotly_chart(fig_fi, use_container_width=True)
+
+st.markdown("""
+**What this chart shows**
+
+This chart displays the most influential features used by the Random Forest
+model to predict flight delay risk.
+
+Feature importance reflects how much each variable contributes to reducing
+prediction uncertainty across the ensemble of decision trees.
+
+**Interpretation**
+
+Weather severity emerges as one of the strongest predictors, confirming its
+central role in operational disruption.
+
+Flight duration and aircraft-related features also contribute meaningfully,
+highlighting that both environmental conditions and operational complexity
+drive delay risk.
+
+This aligns with real-world airline operations, where delays are rarely caused
+by a single factor but by the interaction of multiple constraints.
+""")
+
