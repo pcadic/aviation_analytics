@@ -309,8 +309,8 @@ prediction uncertainty across the ensemble of decision trees.
 
 **Interpretation**
 
-Weather severity emerges as one of the strongest predictors, confirming its
-central role in operational disruption.
+This indicates that flight delays result from a combination of
+environmental and operational factors rather than a single root cause.
 
 Flight duration and aircraft-related features also contribute meaningfully,
 highlighting that both environmental conditions and operational complexity
