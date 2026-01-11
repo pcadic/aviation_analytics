@@ -159,6 +159,48 @@ try:
 except ImportError:
     st.warning("XGBoost not available in this environment")
 
+
+# ============================
+# Predicted Delay Risk Distribution
+# ============================
+st.title("🧠 Predicted Delay Risk Distribution")
+st.caption("Predicting the probability of flight delays using machine learning")
+
+y_proba_rf = rf_model.predict_proba(X_test)[:, 1]
+import plotly.express as px
+
+st.subheader("Predicted Delay Risk Distribution")
+
+proba_df = pd.DataFrame({
+    "Predicted Delay Risk": y_proba_rf
+})
+
+fig_dist = px.histogram(
+    proba_df,
+    x="Predicted Delay Risk",
+    nbins=20,
+    opacity=0.8
+)
+
+fig_dist.update_layout(
+    xaxis_title="Predicted Delay Probability",
+    yaxis_title="",
+    showlegend=False
+)
+
+st.plotly_chart(fig_dist, use_container_width=True)
+
+
+st.markdown(""" ... """)
+st.markdown(""" This chart shows the distribution of predicted delay probabilities
+across the evaluated flights.
+
+Most flights are associated with low to moderate delay risk,
+while a smaller subset exhibits high predicted probabilities.
+High-risk predictions typically correspond to adverse weather
+ """)
+
+
 # ============================
 # TRAIN & ROC
 # ============================
