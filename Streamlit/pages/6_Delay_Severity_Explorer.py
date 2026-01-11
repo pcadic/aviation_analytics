@@ -196,6 +196,14 @@ st.plotly_chart(fig_dist, use_container_width=True)
 st.markdown("""
 This chart shows the distribution of delay severity levels in the dataset.
 
+| Class | Meaning                    |
+| ----- | -------------------------- |
+| 0     | On time / ≤ 15 min         |
+| 1     | Minor delay (15–30 min)    |
+| 2     | Moderate delay (30–60 min) |
+| 3     | Severe delay (> 60 min)    |
+
+
 Most flights fall into the **on-time or minor delay** categories, while
 severe delays remain relatively rare, which reflects real-world airline operations.
 """)
