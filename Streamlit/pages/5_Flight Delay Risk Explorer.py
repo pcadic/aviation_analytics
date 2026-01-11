@@ -56,7 +56,7 @@ st.title("🧠 Flight Delay Risk Explorer")
 st.caption("Predicting the probability of flight delays using machine learning")
 
 # ============================
-# TARGET ENGINEERING (FIXED)
+# TARGET ENGINEERING
 # ============================
 delay_minutes = np.where(
     df["dep_delayed"].notna(),
@@ -97,8 +97,7 @@ y = df_model["delay_risk"]
 # TRAIN / TEST SPLIT
 # ============================
 X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
+    X, y,
     test_size=0.25,
     random_state=42,
     stratify=y
@@ -145,31 +144,22 @@ models = {
     )
 }
 
-try:
-    from xgboost import XGBClassifier
-    models["XGBoost"] = XGBClassifier(
-        n_estimators=200,
-        max_depth=6,
-        learning_rate=0.1,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        eval_metric="logloss",
-        random_state=42
-    )
-except ImportError:
-    st.warning("XGBoost not available in this environment")
+# ============================
+# TRAIN RANDOM FOREST ONCE
+# ============================
+rf_pipeline = Pipeline([
+    ("preprocessor", preprocessor),
+    ("model", models["Random Forest"])
+])
 
+rf_pipeline.fit(X_train, y_train)
 
 # ============================
-# Predicted Delay Risk Distribution
+# PREDICTED DELAY RISK DISTRIBUTION
 # ============================
-st.title("🧠 Predicted Delay Risk Distribution")
-st.caption("Predicting the probability of flight delays using machine learning")
-
-y_proba_rf = rf_model.predict_proba(X_test)[:, 1]
-import plotly.express as px
-
 st.subheader("Predicted Delay Risk Distribution")
+
+y_proba_rf = rf_pipeline.predict_proba(X_test)[:, 1]
 
 proba_df = pd.DataFrame({
     "Predicted Delay Risk": y_proba_rf
@@ -178,8 +168,7 @@ proba_df = pd.DataFrame({
 fig_dist = px.histogram(
     proba_df,
     x="Predicted Delay Risk",
-    nbins=20,
-    opacity=0.8
+    nbins=20
 )
 
 fig_dist.update_layout(
@@ -190,19 +179,18 @@ fig_dist.update_layout(
 
 st.plotly_chart(fig_dist, use_container_width=True)
 
-
-st.markdown(""" ... """)
-st.markdown(""" This chart shows the distribution of predicted delay probabilities
+st.markdown("""
+This chart shows the distribution of predicted delay probabilities
 across the evaluated flights.
 
 Most flights are associated with low to moderate delay risk,
 while a smaller subset exhibits high predicted probabilities.
 High-risk predictions typically correspond to adverse weather
- """)
-
+conditions and increased operational complexity.
+""")
 
 # ============================
-# TRAIN & ROC
+# ROC CURVES
 # ============================
 st.subheader("📊 Model Performance – ROC AUC")
 
@@ -214,34 +202,29 @@ for name, model in models.items():
         ("preprocessor", preprocessor),
         ("model", model)
     ])
-    
     pipe.fit(X_train, y_train)
     y_proba = pipe.predict_proba(X_test)[:, 1]
-    
+
     roc_scores[name] = roc_auc_score(y_test, y_proba)
     roc_curves[name] = roc_curve(y_test, y_proba)
 
 fig = go.Figure()
 
 for name, (fpr, tpr, _) in roc_curves.items():
-    fig.add_trace(
-        go.Scatter(
-            x=fpr,
-            y=tpr,
-            mode="lines",
-            name=f"{name} (AUC={roc_scores[name]:.2f})"
-        )
-    )
-
-fig.add_trace(
-    go.Scatter(
-        x=[0, 1],
-        y=[0, 1],
+    fig.add_trace(go.Scatter(
+        x=fpr,
+        y=tpr,
         mode="lines",
-        line=dict(dash="dash"),
-        showlegend=False
-    )
-)
+        name=f"{name} (AUC={roc_scores[name]:.2f})"
+    ))
+
+fig.add_trace(go.Scatter(
+    x=[0, 1],
+    y=[0, 1],
+    mode="lines",
+    line=dict(dash="dash"),
+    showlegend=False
+))
 
 fig.update_layout(
     xaxis_title="False Positive Rate",
@@ -251,35 +234,13 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
-
-st.markdown(""" ... """)
-st.markdown("""This ROC curve compares the ability of different models to distinguish
-between delayed and non-delayed flights.
-
-The Random Forest model achieves the highest ROC-AUC score, indicating
-a better capability to rank flights by delay risk.
-This suggests that non-linear interactions between weather conditions
-and operational variables play an important role in flight delays.
-""")
-
-
 # ============================
 # FEATURE IMPORTANCE
 # ============================
-st.subheader("🔍 Feature Importance")
+st.subheader("🔍 Feature Importance (Random Forest)")
 
-tree_models = [m for m in models if m != "Logistic Regression"]
-selected_model = st.selectbox("Model", tree_models)
-
-pipe = Pipeline([
-    ("preprocessor", preprocessor),
-    ("model", models[selected_model])
-])
-
-pipe.fit(X_train, y_train)
-
-feature_names = pipe.named_steps["preprocessor"].get_feature_names_out()
-importances = pipe.named_steps["model"].feature_importances_
+feature_names = rf_pipeline.named_steps["preprocessor"].get_feature_names_out()
+importances = rf_pipeline.named_steps["model"].feature_importances_
 
 fi = (
     pd.DataFrame({
@@ -304,63 +265,3 @@ fig_fi.update_layout(
 )
 
 st.plotly_chart(fig_fi, use_container_width=True)
-
-st.markdown(""" ... """)
-st.markdown(""" This chart highlights the most influential features used by the Random Forest
-model to predict flight delay risk.
-
-• Weather severity appear among the strongest contributors.
-• Flight duration and aircraft characteristics also have a measurable impact,
-confirming that delays are driven by both environmental and operational factors.
- """)
-
-st.markdown(""" • Logistic Regression provides a simple and interpretable baseline model,
-while Random Forest improves predictive performance by capturing
-non-linear relationships in the data.
-
-• XGBoost was considered but is not available in the current execution
-environment. This reflects realistic production constraints often
-encountered in deployed analytics systems.
- """)
-
-st.markdown(""" ... """)
-st.markdown(""" The following examples illustrate how the model translates real operational
-and weather conditions into delay risk predictions.
- """)
-st.markdown("""•  Example 1 — Low Risk Flight (~10%)
-
-Weather severity at departure: Normal / No rain, fog, or icing / Short-haul domestic route
-
-Predicted delay risk: ~0.12
-
-Interpretation:
-Under stable weather conditions and limited operational complexity,
-the model assigns a low probability of delay, which aligns with
-real-world airline operations.
- """)
-st.markdown("""•  Example 2 — Medium Risk Flight (~35%)
-
-Moderate precipitation / Strong wind detected at departure / Medium-haul international route
-
-Predicted delay risk: ~0.38
-
-Interpretation:
-Even without severe weather, the combination of wind and precipitation
-significantly increases operational uncertainty, leading to a
-moderate delay risk prediction.
- """)
-st.markdown("""•  Example 3 — High Risk Flight (~70%)
-
-Severe weather severity / Low visibility and strong wind / Longer flight duration
-
-Predicted delay risk: ~0.71
-
-Interpretation:
-The model identifies a high-risk scenario driven by multiple adverse
-weather factors combined with route complexity, reflecting
-typical delay patterns observed in aviation operations.
- """)
-
-
-
-
