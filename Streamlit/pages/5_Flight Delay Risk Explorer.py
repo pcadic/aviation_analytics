@@ -209,6 +209,18 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
+
+st.markdown(""" ... """)
+st.markdown("""This ROC curve compares the ability of different models to distinguish
+between delayed and non-delayed flights.
+
+The Random Forest model achieves the highest ROC-AUC score, indicating
+a better capability to rank flights by delay risk.
+This suggests that non-linear interactions between weather conditions
+and operational variables play an important role in flight delays.
+""")
+
+
 # ============================
 # FEATURE IMPORTANCE
 # ============================
@@ -250,3 +262,69 @@ fig_fi.update_layout(
 )
 
 st.plotly_chart(fig_fi, use_container_width=True)
+
+st.markdown(""" ... """)
+st.markdown(""" This chart highlights the most influential features used by the Random Forest
+model to predict flight delay risk.
+
+Weather-related variables such as wind speed, precipitation, visibility,
+and weather severity appear among the strongest contributors.
+Flight duration and aircraft characteristics also have a measurable impact,
+confirming that delays are driven by both environmental and operational factors.
+ """)
+
+st.markdown(""" Logistic Regression provides a simple and interpretable baseline model,
+while Random Forest improves predictive performance by capturing
+non-linear relationships in the data.
+
+XGBoost was considered but is not available in the current execution
+environment. This reflects realistic production constraints often
+encountered in deployed analytics systems.
+ """)
+
+st.markdown(""" The following examples illustrate how the model translates real operational
+and weather conditions into delay risk predictions.
+ """)
+st.markdown(""" Example 1 — Low Risk Flight (~10%)
+
+• Weather severity at departure: Normal
+• No rain, fog, or icing
+• Short-haul domestic route
+
+Predicted delay risk: ~0.12
+
+Interpretation:
+Under stable weather conditions and limited operational complexity,
+the model assigns a low probability of delay, which aligns with
+real-world airline operations.
+ """)
+st.markdown(""" Example 2 — Medium Risk Flight (~35%)
+
+• Moderate precipitation
+• Strong wind detected at departure
+• Medium-haul international route
+
+Predicted delay risk: ~0.38
+
+Interpretation:
+Even without severe weather, the combination of wind and precipitation
+significantly increases operational uncertainty, leading to a
+moderate delay risk prediction.
+ """)
+st.markdown(""" Example 3 — High Risk Flight (~70%)
+
+• Severe weather severity
+• Low visibility and strong wind
+• Longer flight duration
+
+Predicted delay risk: ~0.71
+
+Interpretation:
+The model identifies a high-risk scenario driven by multiple adverse
+weather factors combined with route complexity, reflecting
+typical delay patterns observed in aviation operations.
+ """)
+
+
+
+
