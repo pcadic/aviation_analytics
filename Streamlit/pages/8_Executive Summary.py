@@ -13,7 +13,7 @@ st.set_page_config(
 # TITLE
 # ============================
 st.title("📊 Executive Summary")
-st.caption("Aviation Analytics & Machine Learning Project")
+st.caption("Aviation Analytics — Key Findings & Takeaways")
 
 st.divider()
 
