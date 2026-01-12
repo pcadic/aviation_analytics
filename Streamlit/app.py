@@ -13,6 +13,8 @@ Welcome to the Aviation Analytics portfolio project.
 Use the menu on the left to explore:
 - Data Pipeline
 - Flight Overview
-- Operational insights
-- Machine Learning (coming soon)
+- Operational Insights
+- Route Network
+- Machine Learning : Flight Delay Risk
+- Machine Learning : Delay Severity Explorer
 """)
