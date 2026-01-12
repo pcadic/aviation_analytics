@@ -34,7 +34,7 @@ st.subheader("3. Update Frequency")
 
 st.markdown("""
 - Flights: every 12 hours  
-- Weather: fetched only when missing  
+- Weather: fetched after flights stored in database 
 """)
 
 st.success("Pipeline loaded successfully ✅")
