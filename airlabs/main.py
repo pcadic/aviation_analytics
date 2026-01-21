@@ -33,6 +33,12 @@ def fetch_realtime(movement):
         return call_airlabs(REALTIME_URL, {"arr_icao": AIRPORT_ICAO})
     return call_airlabs(REALTIME_URL, {"dep_icao": AIRPORT_ICAO})
 
+def deduplicate_rows(rows):
+    unique = {}
+    for r in rows:
+        key = (r["flight_icao"], r["dep_time"])
+        unique[key] = r #garde la derniere version
+    return list(unique.values())
 
 def fetch_flight_info(flight_icao):
     r = requests.get(
@@ -141,6 +147,7 @@ def main():
             rows.append(transform(f, info))
 
     if rows:
+        rows = deduplicate_rows(rows)
         supabase.table("flights_airlabs").upsert(
             rows,
             on_conflict="flight_icao,dep_time"
