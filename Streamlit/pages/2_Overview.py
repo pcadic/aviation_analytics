@@ -30,6 +30,18 @@ st.title("✈️ Overview")
 df = df.dropna(subset=["dep_icao", "arr_icao", "dep_country_ref", "arr_country_ref"])
 
 # =========================
+# AVG FLIGHTS PER HOUR
+# =========================
+if not df.empty:
+    flights_per_hour = (
+        df.groupby(df["dep_time"].dt.hour)
+        .size()
+    )
+    avg_flights_per_hour = round(flights_per_hour.mean(), 2)
+else:
+    avg_flights_per_hour = 0
+
+# =========================
 # ESTIMATED PASSENGERS (SAFE)
 # =========================
 df["avg_pax"] = None
