@@ -3,190 +3,232 @@ import pandas as pd
 import plotly.express as px
 from supabase import create_client
 
-# -------------------------------------------------
+# =========================
 # CONFIG
-# -------------------------------------------------
-st.set_page_config(
-    page_title="Overview",
-    layout="wide"
-)
+# =========================
+st.set_page_config(layout="wide")
 
-st.title("✈️ Flights Overview")
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_ANON_KEY"]
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# -------------------------------------------------
-# SUPABASE CONNECTION
-# -------------------------------------------------
-@st.cache_data(ttl=300)
+# =========================
+# LOAD DATA
+# =========================
+@st.cache_data
 def load_data():
-    supabase = create_client(
-        st.secrets["SUPABASE_URL"],
-        st.secrets["SUPABASE_ANON_KEY"]
-    )
-
-    response = (
-        supabase
-        .table("v_flights_enriched")
-        .select("*")
-        .execute()
-    )
-
-    if not response.data:
-        return pd.DataFrame()
-
-    return pd.DataFrame(response.data)
-
+    res = supabase.table("v_flights_enriched").select("*").execute()
+    return pd.DataFrame(res.data)
 
 df = load_data()
 
-# -------------------------------------------------
-# EMPTY DATA GUARD
-# -------------------------------------------------
-if df.empty:
-    st.warning("No data available.")
-    st.stop()
+# =========================
+# BASIC CLEANING
+# =========================
+st.title("✈️ Overview")
 
-# -------------------------------------------------
-# DATA CLEANING (CRITICAL)
-# -------------------------------------------------
+df = df.dropna(subset=["dep_icao", "arr_icao", "dep_country_ref", "arr_country_ref"])
 
-# --- Datetime columns (Supabase returns strings)
-datetime_cols = ["dep_time", "arr_time"]
+# Estimated passengers
+df["avg_pax"] = (df["ac_min_pax"] + df["ac_max_pax"]) / 2
 
-for col in datetime_cols:
-    if col in df.columns:
-        df[col] = pd.to_datetime(df[col], errors="coerce", utc=True)
-
-# --- Numeric columns
-numeric_cols = [
-    "ac_min_pax",
-    "ac_max_pax",
-    "delay_minutes"
-]
-
-for col in numeric_cols:
-    if col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-
-# Remove rows with invalid departure time
-df = df.dropna(subset=["dep_time"])
-
-# -------------------------------------------------
-# KPI CALCULATIONS
-# -------------------------------------------------
-
-total_flights = len(df)
-
-date_span_hours = (
-    (df["dep_time"].max() - df["dep_time"].min()).total_seconds() / 3600
-    if total_flights > 1 else 0
+# =========================
+# KPI — DOMESTIC VS INTL
+# =========================
+df["is_domestic"] = (
+    (df["dep_country_ref"] == "Canada") &
+    (df["arr_country_ref"] == "Canada")
 )
 
-avg_flights_per_hour = (
-    round(total_flights / date_span_hours, 2)
-    if date_span_hours > 0 else 0
+domestic_pct = round(df["is_domestic"].mean() * 100, 1)
+international_pct = round(100 - domestic_pct, 1)
+
+# =========================
+# KPI — TRAFFIC PER HOUR
+# =========================
+traffic = pd.concat([
+    df[df["arr_icao"] == "CYVR"][["arr_time_utc"]].rename(columns={"arr_time_utc": "time"}),
+    df[df["dep_icao"] == "CYVR"][["dep_time_utc"]].rename(columns={"dep_time_utc": "time"})
+])
+
+traffic["hour"] = pd.to_datetime(traffic["time"]).dt.hour
+avg_flights_per_hour = round(traffic.groupby("hour").size().mean(), 2)
+
+# =========================
+# KPI — ON TIME
+# =========================
+df["effective_delay"] = df.apply(
+    lambda r: r["arr_delayed"] if r["arr_icao"] == "CYVR" else r["dep_delayed"],
+    axis=1
+).fillna(0)
+
+on_time_pct = round((df["effective_delay"] <= 15).mean() * 100, 1)
+
+# =========================
+# KPI — PASSENGERS
+# =========================
+avg_pax_per_flight = round(df["avg_pax"].mean(), 0)
+#total_estimated_pax = int(df["avg_pax"].sum())
+
+# =========================
+# FLIGHT DURATION BUCKETS
+# =========================
+
+df_duration = df.dropna(subset=["duration"]).copy()
+
+df_duration["flight_type"] = pd.cut(
+    df_duration["duration"],
+    bins=[0, 120, 300, 10_000],
+    labels=["Short-haul (<2h)", "Medium-haul (2–5h)", "Long-haul (>5h)"]
 )
 
-avg_delay = (
-    round(df["delay_minutes"].mean(), 1)
-    if "delay_minutes" in df.columns else None
+duration_pct = (
+    df_duration["flight_type"]
+    .value_counts(normalize=True)
+    .mul(100)
+    .round(1)
 )
 
-avg_pax_per_flight = (
-    df[["ac_min_pax", "ac_max_pax"]]
-    .mean(axis=1)
-    .mean()
-)
 
-# -------------------------------------------------
+# =========================
 # KPI DISPLAY
-# -------------------------------------------------
-c1, c2, c3, c4 = st.columns(4)
+# =========================
+c1, c2, c3, c4, c5, c6 = st.columns(6)
 
-c1.metric("Total flights", total_flights)
-c2.metric("Avg flights / hour", avg_flights_per_hour)
-c3.metric(
-    "Avg delay (min)",
-    f"{avg_delay:.1f}" if avg_delay is not None else "N/A"
-)
-c4.metric(
-    "Avg pax / flight",
-    int(avg_pax_per_flight) if not pd.isna(avg_pax_per_flight) else "N/A"
-)
+c1.metric("Avg flights / hour", avg_flights_per_hour)
+c2.metric("Domestic flights", f"{domestic_pct}%")
+c3.metric("On-time flights", f"{on_time_pct}%")
+c4.metric("Short-haul flights", f"{duration_pct.get('Short-haul (<2h)', 0)} %")
+c5.metric("Medium-haul flights", f"{duration_pct.get('Medium-haul (2–5h)', 0)} %")
+c6.metric("Long-haul flights", f"{duration_pct.get('Long-haul (>5h)', 0)} %")
+#idée KPI : nombre d'ailines différentes, nombres de destinations differentes
+#c4.metric("Avg pax / flight", int(avg_pax_per_flight))
+#c5.metric("Total estimated pax", f"{total_estimated_pax:,}")
 
 st.divider()
 
-# -------------------------------------------------
-# FLIGHTS PER HOUR
-# -------------------------------------------------
-df["hour"] = df["dep_time"].dt.hour
-
-flights_per_hour = (
-    df.groupby("hour")
-    .size()
-    .reset_index(name="flights")
+# =========================
+# ORIGINS
+# =========================
+origins = (
+    df[df["arr_icao"] == "CYVR"]["dep_country_ref"]
+    .value_counts(normalize=True)
+    .mul(100)
+    .sort_values()
+    .tail(10)
 )
 
-fig_hour = px.bar(
-    flights_per_hour,
-    x="hour",
-    y="flights",
-    title="Flights per hour (departure time)",
-    labels={"hour": "Hour of day", "flights": "Number of flights"}
+fig_orig = px.bar(
+    origins,
+    orientation="h",
+    title="Top Origin Countries (Arrivals)",
 )
 
-st.plotly_chart(fig_hour, use_container_width=True)
-
-# -------------------------------------------------
-# FLIGHTS PER DAY
-# -------------------------------------------------
-df["date"] = df["dep_time"].dt.date
-
-flights_per_day = (
-    df.groupby("date")
-    .size()
-    .reset_index(name="flights")
+fig_orig.update_traces(
+    text=origins.round(2),
+    texttemplate="%{text} %",
+    hoverinfo="skip"
 )
 
-fig_day = px.line(
-    flights_per_day,
-    x="date",
-    y="flights",
-    markers=True,
-    title="Flights per day",
-    labels={"date": "Date", "flights": "Number of flights"}
+fig_orig.update_layout(
+    xaxis_title="Percentage (%)",
+    yaxis_title="",
+    showlegend=False
 )
 
-st.plotly_chart(fig_day, use_container_width=True)
+st.plotly_chart(fig_orig, width="stretch")
 
-# -------------------------------------------------
-# DELAY DISTRIBUTION
-# -------------------------------------------------
-if "delay_minutes" in df.columns and df["delay_minutes"].notna().any():
-    fig_delay = px.histogram(
-        df,
-        x="delay_minutes",
-        nbins=40,
-        title="Delay distribution (minutes)"
-    )
-    st.plotly_chart(fig_delay, use_container_width=True)
+# =========================
+# DESTINATIONS
+# =========================
+destinations = (
+    df[df["dep_icao"] == "CYVR"]["arr_country_ref"]
+    .value_counts(normalize=True)
+    .mul(100)
+    .sort_values()
+    .tail(10)
+)
 
-# -------------------------------------------------
-# TOP AIRLINES
-# -------------------------------------------------
-if "airline_iata" in df.columns:
-    top_airlines = (
-        df["airline_iata"]
-        .value_counts()
-        .head(10)
-        .reset_index()
-    )
-    top_airlines.columns = ["airline", "flights"]
+fig_dest = px.bar(
+    destinations,
+    orientation="h",
+    title="Top Destination Countries (Departures)",
+)
 
-    fig_airlines = px.bar(
-        top_airlines,
-        x="airline",
-        y="flights",
-        title="Top 10 airlines by number of flights"
-    )
+fig_dest.update_traces(
+    text=destinations.round(2),
+    texttemplate="%{text} %",
+    hoverinfo="skip"
+)
 
-    st.plotly_chart(fig_airlines, use_container_width=True)
+fig_dest.update_layout(
+    xaxis_title="Percentage (%)",
+    yaxis_title="",
+    showlegend=False
+)
+
+st.plotly_chart(fig_dest, width="stretch")
+
+# =========================
+# AIRCRAFT TYPES
+# =========================
+aircrafts = (
+    df["aircraft_icao"]
+    .dropna()
+    .value_counts(normalize=True)
+    .mul(100)
+    .sort_values()
+    .tail(10)
+)
+
+fig_aircraft = px.bar(
+    aircrafts,
+    orientation="h",
+    title="Most Common Aircraft Types"
+)
+
+fig_aircraft.update_traces(
+    text=aircrafts.round(2),
+    texttemplate="%{text} %",
+    hoverinfo="skip"
+)
+
+fig_aircraft.update_layout(
+    xaxis_title="Percentage (%)",
+    yaxis_title="",
+    showlegend=False
+)
+
+st.plotly_chart(fig_aircraft, width="stretch")
+
+# =========================
+# AIRLINES
+# =========================
+airlines = (
+    df["airline_name"]
+    .dropna()
+    .value_counts(normalize=True)
+    .mul(100)
+    .sort_values()
+    .tail(10)
+)
+
+fig_airlines = px.bar(
+    airlines,
+    orientation="h",
+    title="Top Airlines"
+)
+
+fig_airlines.update_traces(
+    text=airlines.round(2),
+    texttemplate="%{text} %",
+    hoverinfo="skip"
+)
+
+fig_airlines.update_layout(
+    xaxis_title="Percentage (%)",
+    yaxis_title="",
+    showlegend=False
+)
+
+st.plotly_chart(fig_airlines, width="stretch")
