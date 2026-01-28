@@ -29,8 +29,16 @@ st.title("✈️ Overview")
 
 df = df.dropna(subset=["dep_icao", "arr_icao", "dep_country_ref", "arr_country_ref"])
 
-# Estimated passengers
-df["avg_pax"] = (df["ac_min_pax"] + df["ac_max_pax"]) / 2
+# =========================
+# ESTIMATED PASSENGERS (SAFE)
+# =========================
+df["avg_pax"] = None
+
+mask_pax_known = df["ac_min_pax"].notna() & df["ac_max_pax"].notna()
+df.loc[mask_pax_known, "avg_pax"] = (
+    df.loc[mask_pax_known, "ac_min_pax"] +
+    df.loc[mask_pax_known, "ac_max_pax"]
+) / 2
 
 # =========================
 # KPI — DOMESTIC VS INTL
@@ -52,7 +60,13 @@ traffic = pd.concat([
 ])
 
 traffic["hour"] = pd.to_datetime(traffic["time"]).dt.hour
-avg_flights_per_hour = round(traffic.groupby("hour").size().mean(), 2)
+
+pax_df = df[df["avg_pax"].notna()]
+avg_pax_per_flight = (
+    round(pax_df["avg_pax"].mean(), 0)
+    if not pax_df.empty
+    else 0
+)
 
 # =========================
 # KPI — ON TIME
