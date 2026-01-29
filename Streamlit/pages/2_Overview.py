@@ -52,7 +52,7 @@ df["is_domestic"] = (
     (df["arr_country_ref"] == "Canada")
 )
 
-domestic_pct = round(df["is_domestic"].mean() * 100, 1) if df["is_domestic"].notna().any() else 0
+domestic_pct = round(df["is_domestic"].mean() * 100, 1)
 
 # =========================
 # KPI — TRAFFIC PER HOUR
