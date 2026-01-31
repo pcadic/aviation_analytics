@@ -22,46 +22,6 @@ def load_data():
 
 df = load_data()
 
-st.subheader("🧪 DEBUG — Raw DataFrame after load")
-
-st.write("Shape:", df.shape)
-
-st.write("Columns:")
-st.write(list(df.columns))
-
-st.write("Dtypes:")
-st.write(df.dtypes)
-
-st.write("First 10 rows:")
-st.dataframe(df.head(10), use_container_width=True)
-
-st.write("Sample dep / arr countries:")
-st.dataframe(
-    df[[
-        "dep_icao",
-        "arr_icao",
-        "dep_country_ref",
-        "arr_country_ref",
-        "airline_name",
-        "aircraft_icao"
-    ]].head(20),
-    use_container_width=True
-)
-
-st.subheader("🔎 DEBUG — Critical value checks")
-
-st.write("Unique dep_country_ref:", df["dep_country_ref"].unique())
-st.write("Unique arr_country_ref:", df["arr_country_ref"].unique())
-
-st.write(
-    "Flights where dep_country_ref != arr_country_ref:",
-    (df["dep_country_ref"] != df["arr_country_ref"]).sum()
-)
-
-st.write("Rows where arr_icao == CYVR:", (df["arr_icao"] == "CYVR").sum())
-st.write("Rows where dep_icao == CYVR:", (df["dep_icao"] == "CYVR").sum())
-
-
 st.title("✈️ Overview")
 
 # =========================
