@@ -2,7 +2,7 @@ name: AirLabs ingestion
 
 on:
   schedule:
-    - cron: "0 23 * * *"   # 04:00 UTC ≈ 20:00 Vancouver, then 16:00 UTC ≈ 08:00 Vancouver
+    - cron: "0 7 * * *"   # 04:00 UTC ≈ 20:00 Vancouver, then 16:00 UTC ≈ 08:00 Vancouver
   workflow_dispatch:
 
 jobs:
