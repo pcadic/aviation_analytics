@@ -95,7 +95,7 @@ df["dest_lon"] = df.apply(
 # ============================
 st.subheader("CYVR Route Network – Destination Density")
 
-fig_map = px.density_mapbox(
+fig_map = px.density_map(
     df,
     lat="dest_lat",
     lon="dest_lon",
@@ -105,7 +105,7 @@ fig_map = px.density_mapbox(
 )
 
 fig_map.update_layout(
-    mapbox_style="open-street-map",
+    map_style="open-street-map",
     margin=dict(l=0, r=0, t=0, b=0),
     showlegend=False
 )
@@ -115,7 +115,7 @@ fig_map.update_layout(
 # ============================
 hub_row = df[df.dep_icao == HUB].iloc[0]
 
-fig_map.add_scattermapbox(
+fig_map.add_scatter(
     lat=[hub_row.dep_latitude],
     lon=[hub_row.dep_longitude],
     mode="markers+text",
