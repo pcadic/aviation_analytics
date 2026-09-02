@@ -101,7 +101,11 @@ fig_map = px.density_map(
     lat="dest_lat",
     lon="dest_lon",
     radius=25,
-    zoom=3,
+    zoom=5,
+    center=dict(
+        lat=hub_row.dep_latitude,
+        lon=hub_row.dep_longitude
+    ),
     height=650
 )
 
