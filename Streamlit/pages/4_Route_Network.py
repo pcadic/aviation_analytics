@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from supabase import create_client
+import plotly.graph_objects as go
 
 # ============================
 # CONFIG
@@ -115,19 +116,21 @@ fig_map.update_layout(
 # ============================
 hub_row = df[df.dep_icao == HUB].iloc[0]
 
-fig_map.add_scatter(
-    lat=[hub_row.dep_latitude],
-    lon=[hub_row.dep_longitude],
-    mode="markers+text",
-    marker=dict(
-        size=10,
-        color="red",
-        opacity=0.9
-    ),
-    text=["Vancouver (CYVR)"],
-    textposition="top center",
-    hoverinfo="skip",
-    showlegend=False
+fig_map.add_trace(
+    go.Scattermap(
+        lat=[hub_row.dep_latitude],
+        lon=[hub_row.dep_longitude],
+        mode="markers+text",
+        marker=dict(
+            size=10,
+            color="red",
+            opacity=0.9
+        ),
+        text=["Vancouver (CYVR)"],
+        textposition="top center",
+        hoverinfo="skip",
+        showlegend=False
+    )
 )
 
 st.plotly_chart(fig_map, use_container_width=True)
