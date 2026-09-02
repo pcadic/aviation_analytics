@@ -96,6 +96,8 @@ df["dest_lon"] = df.apply(
 # ============================
 st.subheader("CYVR Route Network – Destination Density")
 
+hub_row = df[df.dep_icao == HUB].iloc[0]
+
 fig_map = px.density_map(
     df,
     lat="dest_lat",
@@ -118,7 +120,6 @@ fig_map.update_layout(
 # ============================
 # CYVR HUB — SMALL RED POINT
 # ============================
-hub_row = df[df.dep_icao == HUB].iloc[0]
 
 fig_map.add_trace(
     go.Scattermap(
